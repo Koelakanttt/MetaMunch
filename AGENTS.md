@@ -15,7 +15,7 @@ Desktop app for League of Legends (region EUW). Uses only public data. Read-only
 7. TypeScript strict, no `any`. Code and comments in English; comment only non-obvious things.
 8. All network access only inside `src/main/providers/`. The renderer never makes network calls and never imports from `src/main`.
 9. Must work on Windows (no bash-only scripts). No git commands unless the task says so.
-
+10. Do NOT run npm install, lint, typecheck, test, build or dev. Write files only. The owner runs all commands and reports results.
 ## Stop and ask when
 - an install or build step fails twice;
 - the task needs a file or dependency it does not list;
