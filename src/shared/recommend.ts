@@ -46,6 +46,14 @@ export const MAX_ITEMS = 6
 export const MAX_BOOTS = 2
 export const CORE_TARGET = 4
 const MAX_REASONS = 2
+/** A Data Dragon "Tank" champion counts as a real tank only with this much defense rating. */
+export const TANK_MIN_DEFENSE = 7
+
+export function isTank(champion: Champion, tags: ChampionTags): boolean {
+  const override = tags.champions[champion.id]?.tank
+  if (override !== undefined) return override
+  return champion.tags.includes('Tank') && champion.info.defense >= TANK_MIN_DEFENSE
+}
 
 export function damageClass(champion: Champion, tags: ChampionTags): Damage {
   const explicit = tags.champions[champion.id]?.damage
@@ -78,7 +86,7 @@ export function buildEnemyProfile(enemies: readonly Champion[], tags: ChampionTa
     const tag = tags.champions[champion.id]
     if (tag?.healing) names.healers.push(champion.name)
     if (tag?.cc === 'hard') names.hardCc.push(champion.name)
-    if (champion.tags.includes('Tank')) names.tanks.push(champion.name)
+    if (isTank(champion, tags)) names.tanks.push(champion.name)
     if (champion.tags.includes('Assassin')) names.assassins.push(champion.name)
     if (champion.tags.includes('Marksman')) names.marksmen.push(champion.name)
     if (champion.tags.includes('Mage')) names.mages.push(champion.name)

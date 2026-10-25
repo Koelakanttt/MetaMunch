@@ -6,13 +6,13 @@ import { buildEnemyProfile, damageClass, formatReason, recommend } from '../../s
 import { parseChampionTags, parseRules, type Rules } from '../../src/shared/rules'
 import { mkItem, stats } from '../helpers/items'
 
-function champ(id: string, tags: string[], attack: number, magic: number, mp = 300): Champion {
+function champ(id: string, tags: string[], attack: number, magic: number, mp = 300, defense = 5): Champion {
   return {
     key: 1,
     id,
     name: id,
     tags,
-    info: { attack, defense: 5, magic, difficulty: 5 },
+    info: { attack, defense, magic, difficulty: 5 },
     stats: { mp },
   }
 }
@@ -22,7 +22,8 @@ const ahri = champ('Ahri', ['Mage', 'Assassin'], 3, 8)
 const soraka = champ('Soraka', ['Support', 'Mage'], 2, 7)
 const vladimir = champ('Vladimir', ['Mage', 'Tank'], 2, 8)
 const syndra = champ('Syndra', ['Mage'], 2, 9)
-const leona = champ('Leona', ['Tank', 'Support'], 4, 3)
+const leona = champ('Leona', ['Tank', 'Support'], 4, 3, 300, 8)
+const ornn = champ('Ornn', ['Tank', 'Fighter'], 5, 3, 300, 9)
 const aatrox = champ('Aatrox', ['Fighter', 'Tank'], 8, 3)
 const zed = champ('Zed', ['Assassin'], 9, 1)
 const jinx = champ('Jinx', ['Marksman'], 9, 2)
@@ -79,10 +80,15 @@ describe('damageClass / profile', () => {
     expect(p.metrics.enemies).toBe(5)
     expect(p.metrics.healers).toBe(2)
     expect(p.metrics.hardCc).toBe(2)
-    expect(p.metrics.tanks).toBe(2)
+    expect(p.metrics.tanks).toBe(1) // Vladimir has the Tank tag but low defense
     expect(p.metrics.apShare).toBeCloseTo(0.9)
     expect(p.names.healers).toEqual(['Soraka', 'Vladimir'])
     expect(formatReason('{apShare} / {healers} / {healersNames} / {nope}', p)).toBe('90% / 2 / Soraka, Vladimir / {nope}')
+  })
+  it('lets champion-tags override tank detection', () => {
+    const t = parseChampionTags({ version: 1, champions: { Darius: { tank: true }, Leona: { tank: false } } })
+    const p = buildEnemyProfile([darius, leona, ornn], t)
+    expect(p.names.tanks).toEqual(['Darius', 'Ornn'])
   })
   it('handles an empty enemy list', () => {
     const p = buildEnemyProfile([], tags)
@@ -121,7 +127,7 @@ describe('recommend by rules', () => {
     expect(names(r.boots)[0]).toBe('Plated Steelcaps')
   })
   it('uses armor penetration against tanks for AD and magic penetration for AP', () => {
-    const tanks = [leona, vladimir, darius]
+    const tanks = [leona, ornn, darius]
     expect(names(run(garen, tanks).items)).toContain('Mortal Reminder')
     expect(names(run(ahri, tanks).items)).toContain('Void Staff')
   })

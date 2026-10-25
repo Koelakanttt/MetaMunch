@@ -94,6 +94,7 @@ export type Rules = z.infer<typeof RulesFileSchema>
 const ChampionTagSchema = z.object({
   damage: z.enum(['ad', 'ap', 'mixed']).optional(),
   healing: z.boolean().optional(), // strong self or ally healing/sustain
+  tank: z.boolean().optional(), // overrides the automatic tank detection (true or false)
   cc: z.literal('hard').optional(), // reliable stun / knock-up / suppress / root / long CC
 })
 

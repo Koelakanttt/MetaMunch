@@ -1,3 +1,5 @@
+import type { ChampionListResponse, RecommendRequest, RecommendResponse } from './recommend-api'
+
 export interface IpcChannels {
   'app:ping': { req: { message: string }; res: { reply: string; at: number } }
   'db:info': { req: Record<string, never>; res: { schemaVersion: number; sqliteVersion: string } }
@@ -6,6 +8,8 @@ export interface IpcChannels {
   'account:set': { req: { riotId: string }; res: { gameName: string; tagLine: string } }
   'matches:status': { req: Record<string, never>; res: { account: { gameName: string; tagLine: string } | null; matches: number; lastGameCreation: number | null } }
   'matches:sync': { req: Record<string, never>; res: { requested: number; saved: number; skippedExisting: number; failed: number } }
+  'champions:list': { req: Record<string, never>; res: ChampionListResponse }
+  'recommend:run': { req: RecommendRequest; res: RecommendResponse }
 }
 export type IpcChannel = keyof IpcChannels
 export type IpcReq<C extends IpcChannel> = IpcChannels[C]['req']

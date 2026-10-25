@@ -1,8 +1,10 @@
 import { join } from 'node:path'
 import { app, BrowserWindow } from 'electron'
+import { loadChampionTags, loadRules } from './data/rules-data'
 import { migrations } from './db/migrations'
 import { runMigrations } from './db/migrate'
 import { openDb } from './db/open'
+import { createDbSource } from './db/static-data-source'
 import { getRiotApiKey, loadEnv } from './env'
 import { createHandlers } from './ipc/handlers'
 import { registerIpc } from './ipc/register'
@@ -10,6 +12,7 @@ import { HttpDataDragonProvider } from './providers/http-data-dragon'
 import { HttpRiotApiProvider } from './providers/http-riot-api'
 import { MissingKeyRiotApiProvider } from './providers/missing-key-riot-api'
 import { MatchSyncService } from './services/match-sync-service'
+import { RecommendationService } from './services/recommendation-service'
 import { StaticDataService } from './services/static-data-service'
 
 loadEnv(app.getAppPath())
@@ -44,7 +47,12 @@ void app.whenReady().then(() => {
   runMigrations(db, migrations)
   const staticData = new StaticDataService({ db, provider: new HttpDataDragonProvider() })
   const matchSync = new MatchSyncService({ db, provider: riotProvider })
-  registerIpc(createHandlers({ db, staticData, matchSync }))
+  const recommendation = new RecommendationService({
+    source: createDbSource(db),
+    rules: loadRules(),
+    tags: loadChampionTags(),
+  })
+  registerIpc(createHandlers({ db, staticData, matchSync, recommendation }))
   createWindow()
 
   app.on('will-quit', () => {

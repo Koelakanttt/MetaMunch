@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { RecommendPage } from './pages/RecommendPage'
 
 interface StaticDataStatus {
   version: string | null
@@ -22,6 +23,7 @@ export default function App() {
   const [matchCount, setMatchCount] = useState(0)
   const [syncing, setSyncing] = useState(false)
   const [matchMessage, setMatchMessage] = useState('')
+  const [refreshKey, setRefreshKey] = useState(0)
 
   async function ping(): Promise<void> {
     const res = await window.api.invoke('app:ping', { message: 'hi' })
@@ -66,6 +68,7 @@ export default function App() {
     try {
       const res = await window.api.invoke('staticData:refresh', {})
       setUpdateMessage(res.fromCache ? 'up to date' : 'updated')
+      setRefreshKey((value) => value + 1)
       const status = await window.api.invoke('staticData:status', {})
       setStaticStatus(status)
     } catch (error) {
@@ -118,6 +121,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-900 p-8 text-slate-100">
       <h1 className="text-3xl font-semibold">MetaMunch</h1>
+      <RecommendPage refreshKey={refreshKey} />
       <button
         type="button"
         className="mt-6 rounded bg-slate-700 px-4 py-2 hover:bg-slate-600"

@@ -2,12 +2,14 @@ import type { DatabaseSync } from 'node:sqlite'
 import type { IpcHandlers } from '@shared/ipc'
 import { getSchemaVersion } from '../db/migrate'
 import type { MatchSyncService } from '../services/match-sync-service'
+import type { RecommendationService } from '../services/recommendation-service'
 import type { StaticDataService } from '../services/static-data-service'
 
 export function createHandlers(deps: {
   db: DatabaseSync
   staticData: StaticDataService
   matchSync: MatchSyncService
+  recommendation: RecommendationService
 }): IpcHandlers {
   return {
     'app:ping': ({ message }) => ({ reply: 'pong: ' + message, at: Date.now() }),
@@ -39,5 +41,7 @@ export function createHandlers(deps: {
     },
     'matches:status': () => deps.matchSync.status(),
     'matches:sync': () => deps.matchSync.sync(),
+    'champions:list': () => deps.recommendation.listChampions(),
+    'recommend:run': (req) => deps.recommendation.run(req),
   }
 }

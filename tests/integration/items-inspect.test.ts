@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { HttpDataDragonProvider } from '../../src/main/providers/http-data-dragon'
 import { buildItemPool, itemTraits, plainText, unknownStatLabels } from '../../src/shared/item-traits'
+import { isTank } from '../../src/shared/recommend'
 import { parseChampionTags, parseRules } from '../../src/shared/rules'
 
 function readData(name: string): unknown {
@@ -85,6 +86,12 @@ describe.skipIf(!process.env['LIVE'])('item inspection (live)', () => {
       '',
       '== champion-tags.json IDS NOT FOUND IN DATA DRAGON ==',
       ...Object.keys(tags.champions).filter((id) => !knownIds.has(id)),
+      '',
+      '== CHAMPIONS WITH THE TANK TAG (defense, counted as tank?) ==',
+      ...champions
+        .filter((c) => c.tags.includes('Tank'))
+        .sort((a, b) => b.info.defense - a.info.defense)
+        .map((c) => `${c.name}: defense=${c.info.defense} -> ${isTank(c, tags) ? 'TANK' : 'not tank'}`),
       '',
       '== DATA DRAGON CHAMPION TAGS (count) ==',
       ...histogram(champions.flatMap((c) => c.tags)),
