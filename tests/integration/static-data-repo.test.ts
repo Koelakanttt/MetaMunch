@@ -60,4 +60,29 @@ describe('static data repo', () => {
     const row = db.prepare('SELECT count(*) AS c FROM patches').get() as { c?: unknown } | undefined
     expect(Number(row?.c)).toBe(0)
   })
+
+  it('stores item availability fields', () => {
+    const db = migratedDb()
+    const base = items[0]
+    if (!base) throw new Error('missing fixture item')
+
+    const unavailable = {
+      ...base,
+      id: 9001,
+      inStore: false,
+      requiredAlly: 'Ornn',
+      requiredChampion: null,
+    }
+    const locked = {
+      ...base,
+      id: 9002,
+      inStore: true,
+      requiredAlly: null,
+      requiredChampion: 'Viktor',
+    }
+
+    savePatch(db, '16.3.2', [], [unavailable, locked], 5)
+
+    expect(listItems(db, '16.3.2')).toEqual([unavailable, locked])
+  })
 })

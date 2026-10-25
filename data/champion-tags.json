@@ -1,0 +1,226 @@
+{
+ "version": 1,
+ "champions": {
+  "Aatrox": {
+   "healing": true
+  },
+  "Akali": {
+   "damage": "ap"
+  },
+  "Alistar": {
+   "healing": true,
+   "cc": "hard"
+  },
+  "Amumu": {
+   "damage": "ap",
+   "cc": "hard"
+  },
+  "Ashe": {
+   "cc": "hard"
+  },
+  "Blitzcrank": {
+   "cc": "hard"
+  },
+  "Braum": {
+   "cc": "hard"
+  },
+  "Briar": {
+   "healing": true
+  },
+  "Corki": {
+   "damage": "mixed"
+  },
+  "Diana": {
+   "damage": "ap"
+  },
+  "DrMundo": {
+   "healing": true
+  },
+  "Elise": {
+   "damage": "ap",
+   "cc": "hard"
+  },
+  "Evelynn": {
+   "damage": "ap"
+  },
+  "Ezreal": {
+   "damage": "mixed"
+  },
+  "Fiora": {
+   "healing": true
+  },
+  "Fizz": {
+   "damage": "ap"
+  },
+  "Galio": {
+   "cc": "hard"
+  },
+  "Gragas": {
+   "damage": "ap"
+  },
+  "Gwen": {
+   "damage": "ap",
+   "healing": true
+  },
+  "Hecarim": {
+   "cc": "hard"
+  },
+  "Illaoi": {
+   "healing": true
+  },
+  "JarvanIV": {
+   "cc": "hard"
+  },
+  "Jax": {
+   "damage": "mixed"
+  },
+  "Kayle": {
+   "damage": "mixed",
+   "healing": true
+  },
+  "Kayn": {
+   "healing": true
+  },
+  "KogMaw": {
+   "damage": "mixed"
+  },
+  "Leona": {
+   "cc": "hard"
+  },
+  "Lissandra": {
+   "cc": "hard"
+  },
+  "Lux": {
+   "cc": "hard"
+  },
+  "Malphite": {
+   "cc": "hard"
+  },
+  "Maokai": {
+   "cc": "hard"
+  },
+  "MasterYi": {
+   "healing": true
+  },
+  "Milio": {
+   "healing": true
+  },
+  "Mordekaiser": {
+   "damage": "ap"
+  },
+  "Morgana": {
+   "cc": "hard"
+  },
+  "Nami": {
+   "healing": true
+  },
+  "Nautilus": {
+   "cc": "hard"
+  },
+  "Nunu": {
+   "cc": "hard"
+  },
+  "Olaf": {
+   "healing": true
+  },
+  "Ornn": {
+   "cc": "hard"
+  },
+  "Poppy": {
+   "cc": "hard"
+  },
+  "Rammus": {
+   "cc": "hard"
+  },
+  "Rell": {
+   "cc": "hard"
+  },
+  "Renekton": {
+   "cc": "hard"
+  },
+  "Rumble": {
+   "damage": "ap"
+  },
+  "Samira": {
+   "healing": true
+  },
+  "Sejuani": {
+   "cc": "hard"
+  },
+  "Seraphine": {
+   "healing": true
+  },
+  "Shyvana": {
+   "damage": "mixed"
+  },
+  "Singed": {
+   "damage": "ap"
+  },
+  "Sion": {
+   "cc": "hard"
+  },
+  "Skarner": {
+   "cc": "hard"
+  },
+  "Sona": {
+   "healing": true
+  },
+  "Soraka": {
+   "healing": true
+  },
+  "Swain": {
+   "healing": true
+  },
+  "Sylas": {
+   "healing": true
+  },
+  "Syndra": {
+   "cc": "hard"
+  },
+  "Taric": {
+   "healing": true,
+   "cc": "hard"
+  },
+  "Teemo": {
+   "damage": "ap"
+  },
+  "Thresh": {
+   "cc": "hard"
+  },
+  "Trundle": {
+   "healing": true
+  },
+  "Tryndamere": {
+   "healing": true
+  },
+  "Veigar": {
+   "cc": "hard"
+  },
+  "Vi": {
+   "cc": "hard"
+  },
+  "Vladimir": {
+   "healing": true
+  },
+  "Volibear": {
+   "healing": true
+  },
+  "Warwick": {
+   "healing": true,
+   "cc": "hard"
+  },
+  "Xerath": {
+   "cc": "hard"
+  },
+  "Yuumi": {
+   "healing": true
+  },
+  "Zac": {
+   "healing": true,
+   "cc": "hard"
+  },
+  "Zyra": {
+   "cc": "hard"
+  }
+ }
+}

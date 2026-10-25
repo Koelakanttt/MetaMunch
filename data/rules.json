@@ -1,0 +1,327 @@
+{
+  "version": 1,
+  "excludeItems": [],
+  "excludeItemsByRole": {
+    "TOP": [
+      "Ardent Censer",
+      "Dawncore",
+      "Echoes of Helia",
+      "Imperial Mandate",
+      "Locket of the Iron Solari",
+      "Mikael's Blessing",
+      "Moonstone Renewer",
+      "Redemption",
+      "Shurelya's Battlesong",
+      "Staff of Flowing Water",
+      "Zeke's Convergence",
+      "Knight's Vow"
+    ],
+    "JUNGLE": [
+      "Ardent Censer",
+      "Dawncore",
+      "Echoes of Helia",
+      "Imperial Mandate",
+      "Locket of the Iron Solari",
+      "Mikael's Blessing",
+      "Moonstone Renewer",
+      "Redemption",
+      "Shurelya's Battlesong",
+      "Staff of Flowing Water",
+      "Zeke's Convergence",
+      "Knight's Vow"
+    ],
+    "MIDDLE": [
+      "Ardent Censer",
+      "Dawncore",
+      "Echoes of Helia",
+      "Imperial Mandate",
+      "Locket of the Iron Solari",
+      "Mikael's Blessing",
+      "Moonstone Renewer",
+      "Redemption",
+      "Shurelya's Battlesong",
+      "Staff of Flowing Water",
+      "Zeke's Convergence",
+      "Knight's Vow"
+    ],
+    "BOTTOM": [
+      "Ardent Censer",
+      "Dawncore",
+      "Echoes of Helia",
+      "Imperial Mandate",
+      "Locket of the Iron Solari",
+      "Mikael's Blessing",
+      "Moonstone Renewer",
+      "Redemption",
+      "Shurelya's Battlesong",
+      "Staff of Flowing Water",
+      "Zeke's Convergence",
+      "Knight's Vow"
+    ]
+  },
+  "rules": [
+    {
+      "id": "antiheal-many-healers",
+      "when": [
+        {
+          "metric": "healers",
+          "atLeast": 2
+        }
+      ],
+      "anyOf": [
+        "antiheal"
+      ],
+      "weight": 4,
+      "reason": "{healers} enemies rely on healing ({healersNames}): Grievous Wounds cuts their sustain."
+    },
+    {
+      "id": "antiheal-one-healer",
+      "when": [
+        {
+          "metric": "healers",
+          "atLeast": 1,
+          "atMost": 1
+        }
+      ],
+      "anyOf": [
+        "antiheal"
+      ],
+      "weight": 2,
+      "reason": "{healersNames} relies on healing: Grievous Wounds reduces it."
+    },
+    {
+      "id": "armor-vs-physical",
+      "when": [
+        {
+          "metric": "enemies",
+          "atLeast": 3
+        },
+        {
+          "metric": "adShare",
+          "atLeast": 0.6
+        }
+      ],
+      "anyOf": [
+        "armor"
+      ],
+      "weight": 3,
+      "reason": "Enemy damage is mostly physical ({adShare}): armor pays off."
+    },
+    {
+      "id": "mr-vs-magic",
+      "when": [
+        {
+          "metric": "enemies",
+          "atLeast": 3
+        },
+        {
+          "metric": "apShare",
+          "atLeast": 0.6
+        }
+      ],
+      "anyOf": [
+        "mr"
+      ],
+      "weight": 3,
+      "reason": "Enemy damage is mostly magic ({apShare}): magic resist pays off."
+    },
+    {
+      "id": "both-resists-vs-mixed",
+      "when": [
+        {
+          "metric": "enemies",
+          "atLeast": 3
+        },
+        {
+          "metric": "adShare",
+          "atLeast": 0.35,
+          "atMost": 0.65
+        }
+      ],
+      "allOf": [
+        "armor",
+        "mr"
+      ],
+      "weight": 2,
+      "reason": "Damage is mixed ({adShare} physical): an item with both resistances covers both."
+    },
+    {
+      "id": "armor-pen-vs-tanks",
+      "when": [
+        {
+          "metric": "tanks",
+          "atLeast": 2
+        }
+      ],
+      "myDamage": "ad",
+      "anyOf": [
+        "armorPen"
+      ],
+      "weight": 3,
+      "reason": "{tanks} tanky enemies ({tanksNames}): armor penetration keeps your damage relevant."
+    },
+    {
+      "id": "magic-pen-vs-tanks",
+      "when": [
+        {
+          "metric": "tanks",
+          "atLeast": 2
+        }
+      ],
+      "myDamage": "ap",
+      "anyOf": [
+        "magicPen"
+      ],
+      "weight": 3,
+      "reason": "{tanks} tanky enemies ({tanksNames}): magic penetration keeps your damage relevant."
+    },
+    {
+      "id": "tenacity-vs-cc",
+      "when": [
+        {
+          "metric": "hardCc",
+          "atLeast": 3
+        }
+      ],
+      "anyOf": [
+        "tenacity"
+      ],
+      "weight": 2,
+      "reason": "{hardCc} enemies have reliable hard crowd control ({hardCcNames}): tenacity shortens it."
+    },
+    {
+      "id": "health-vs-assassins",
+      "when": [
+        {
+          "metric": "assassins",
+          "atLeast": 2
+        }
+      ],
+      "anyOf": [
+        "health"
+      ],
+      "weight": 1,
+      "reason": "{assassins} assassins on the enemy team ({assassinsNames}): extra health to survive burst."
+    },
+    {
+      "id": "boots-tenacity-vs-cc",
+      "slot": "boots",
+      "when": [
+        {
+          "metric": "hardCc",
+          "atLeast": 3
+        }
+      ],
+      "anyOf": [
+        "tenacity"
+      ],
+      "weight": 3,
+      "reason": "{hardCc} enemies have hard crowd control ({hardCcNames}): tenacity boots."
+    },
+    {
+      "id": "boots-armor-vs-physical",
+      "slot": "boots",
+      "when": [
+        {
+          "metric": "enemies",
+          "atLeast": 3
+        },
+        {
+          "metric": "adShare",
+          "atLeast": 0.6
+        }
+      ],
+      "anyOf": [
+        "armor"
+      ],
+      "weight": 3,
+      "reason": "Enemy damage is mostly physical ({adShare}): armor boots."
+    },
+    {
+      "id": "boots-mr-vs-magic",
+      "slot": "boots",
+      "when": [
+        {
+          "metric": "enemies",
+          "atLeast": 3
+        },
+        {
+          "metric": "apShare",
+          "atLeast": 0.6
+        }
+      ],
+      "anyOf": [
+        "mr"
+      ],
+      "weight": 3,
+      "reason": "Enemy damage is mostly magic ({apShare}): magic resist boots."
+    },
+    {
+      "id": "boots-haste-default",
+      "slot": "boots",
+      "when": [
+        {
+          "metric": "enemies",
+          "atLeast": 1
+        }
+      ],
+      "anyOf": [
+        "abilityHaste"
+      ],
+      "weight": 1,
+      "reason": "No special threat in the enemy team: ability haste boots."
+    }
+  ],
+  "coreByClass": {
+    "Fighter": {
+      "traits": [
+        "ad",
+        "health",
+        "abilityHaste"
+      ],
+      "reason": "Generic core for fighters: damage with health and ability haste."
+    },
+    "Tank": {
+      "traits": [
+        "health",
+        "armor",
+        "mr",
+        "abilityHaste"
+      ],
+      "reason": "Generic core for tanks: health, resistances and ability haste."
+    },
+    "Mage": {
+      "traits": [
+        "ap",
+        "abilityHaste",
+        "mana",
+        "magicPen"
+      ],
+      "reason": "Generic core for mages: ability power with haste, mana or penetration."
+    },
+    "Assassin": {
+      "traits": [
+        "ad",
+        "armorPen",
+        "abilityHaste"
+      ],
+      "reason": "Generic core for assassins: damage, penetration and ability haste."
+    },
+    "Marksman": {
+      "traits": [
+        "ad",
+        "attackSpeed",
+        "crit"
+      ],
+      "reason": "Generic core for marksmen: damage with attack speed or crit."
+    },
+    "Support": {
+      "traits": [
+        "abilityHaste",
+        "healShieldPower",
+        "mana"
+      ],
+      "reason": "Generic core for supports: ability haste, heal and shield power, mana."
+    }
+  }
+}

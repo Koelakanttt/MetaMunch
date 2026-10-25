@@ -15,6 +15,7 @@
     "test": "vitest run",
     "test:live": "cross-env LIVE=1 vitest run tests/integration/ddragon-live.test.ts",
     "test:live:riot": "cross-env LIVE_RIOT=1 vitest run tests/integration/riot-live.test.ts",
+    "inspect:items": "cross-env LIVE=1 vitest run tests/integration/items-inspect.test.ts",
     "spike:sqlite": "cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/sqlite-spike.cjs"
   },
   "repository": {

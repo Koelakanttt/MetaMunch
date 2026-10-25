@@ -67,4 +67,18 @@ describe('parseItemList', () => {
   it('throws when nothing is valid', () => {
     expect(() => parseItemList({ data: { '1': {} } })).toThrow()
   })
+  it('reads availability fields with safe defaults', () => {
+    const gold = { total: 3000, purchasable: true }
+    const { values } = parseItemList({
+      data: {
+        '1': { name: 'Ornn upgrade', gold, inStore: false, requiredAlly: 'Ornn' },
+        '2': { name: 'Locked', gold, requiredChampion: 'Viktor' },
+        '3': { name: 'Plain', gold, requiredAlly: '' },
+      },
+    })
+    const byId = new Map(values.map((i) => [i.id, i]))
+    expect(byId.get(1)).toMatchObject({ inStore: false, requiredAlly: 'Ornn', requiredChampion: null })
+    expect(byId.get(2)).toMatchObject({ inStore: true, requiredAlly: null, requiredChampion: 'Viktor' })
+    expect(byId.get(3)).toMatchObject({ inStore: true, requiredAlly: null, requiredChampion: null })
+  })
 })

@@ -39,7 +39,7 @@ describe('ipc handlers', () => {
   it('reports db info', async () => {
     const res = await handlers['db:info']({})
 
-    expect(res.schemaVersion).toBe(3)
+    expect(res.schemaVersion).toBe(4)
     expect(res.sqliteVersion).toMatch(/^3\./)
   })
 })

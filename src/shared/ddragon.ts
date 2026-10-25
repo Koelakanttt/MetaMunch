@@ -28,6 +28,9 @@ export interface Item {
   from: number[]
   into: number[]
   maps: Record<string, boolean> // map id -> available
+  inStore: boolean // false for items that cannot be bought in the shop
+  requiredAlly: string | null // e.g. "Ornn" for his upgrades
+  requiredChampion: string | null // champion-locked items
 }
 
 export interface ParseResult<T> {
@@ -63,6 +66,9 @@ const ItemRaw = z.object({
   from: z.array(z.string()).default([]),
   into: z.array(z.string()).default([]),
   maps: z.record(z.string(), z.boolean()).default({}),
+  inStore: z.boolean().default(true),
+  requiredAlly: z.string().optional(),
+  requiredChampion: z.string().optional(),
 })
 
 const ListRaw = z.object({ data: z.record(z.string(), z.unknown()) })
@@ -137,6 +143,9 @@ export function parseItemList(json: unknown): ParseResult<Item> {
         from: toIds(i.from),
         into: toIds(i.into),
         maps: i.maps,
+        inStore: i.inStore,
+        requiredAlly: i.requiredAlly || null,
+        requiredChampion: i.requiredChampion || null,
       }
     },
     (i) => i.id,

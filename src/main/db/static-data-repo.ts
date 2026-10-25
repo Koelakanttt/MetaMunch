@@ -41,8 +41,9 @@ export function savePatch(
 
     const insertItem = db.prepare(
       `INSERT INTO items
-        (patch, id, name, plaintext, description, tags, stats, gold_total, purchasable, from_ids, into_ids, maps)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (patch, id, name, plaintext, description, tags, stats, gold_total, purchasable,
+         from_ids, into_ids, maps, in_store, required_ally, required_champion)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     for (const item of items) {
       insertItem.run(
@@ -58,6 +59,9 @@ export function savePatch(
         JSON.stringify(item.from),
         JSON.stringify(item.into),
         JSON.stringify(item.maps),
+        item.inStore ? 1 : 0,
+        item.requiredAlly,
+        item.requiredChampion,
       )
     }
 
@@ -113,10 +117,15 @@ export function listChampions(db: DatabaseSync, version: string): Champion[] {
   }))
 }
 
+function nullableString(value: unknown): string | null {
+  return value === null || value === undefined ? null : String(value)
+}
+
 export function listItems(db: DatabaseSync, version: string): Item[] {
   const rows = db
     .prepare(
-      `SELECT id, name, plaintext, description, tags, stats, gold_total, purchasable, from_ids, into_ids, maps
+      `SELECT id, name, plaintext, description, tags, stats, gold_total, purchasable,
+              from_ids, into_ids, maps, in_store, required_ally, required_champion
        FROM items
        WHERE patch = ?
        ORDER BY id`,
@@ -133,6 +142,9 @@ export function listItems(db: DatabaseSync, version: string): Item[] {
     from_ids?: unknown
     into_ids?: unknown
     maps?: unknown
+    in_store?: unknown
+    required_ally?: unknown
+    required_champion?: unknown
   }[]
 
   return rows.map((row) => ({
@@ -147,5 +159,8 @@ export function listItems(db: DatabaseSync, version: string): Item[] {
     from: JSON.parse(String(row.from_ids)) as number[],
     into: JSON.parse(String(row.into_ids)) as number[],
     maps: JSON.parse(String(row.maps)) as Record<string, boolean>,
+    inStore: Number(row.in_store) === 1,
+    requiredAlly: nullableString(row.required_ally),
+    requiredChampion: nullableString(row.required_champion),
   }))
 }
