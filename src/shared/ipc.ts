@@ -1,5 +1,6 @@
 export interface IpcChannels {
   'app:ping': { req: { message: string }; res: { reply: string; at: number } }
+  'db:info': { req: Record<string, never>; res: { schemaVersion: number; sqliteVersion: string } }
 }
 export type IpcChannel = keyof IpcChannels
 export type IpcReq<C extends IpcChannel> = IpcChannels[C]['req']

@@ -1,12 +1,24 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 export default function App() {
   const [reply, setReply] = useState('')
+  const [dbInfo, setDbInfo] = useState('loading…')
 
   async function ping(): Promise<void> {
     const res = await window.api.invoke('app:ping', { message: 'hi' })
     setReply(res.reply)
   }
+
+  useEffect(() => {
+    window.api
+      .invoke('db:info', {})
+      .then((info) => {
+        setDbInfo(`schema v${info.schemaVersion} · SQLite ${info.sqliteVersion}`)
+      })
+      .catch(() => {
+        setDbInfo('db error')
+      })
+  }, [])
 
   return (
     <div className="min-h-screen bg-slate-900 p-8 text-slate-100">
@@ -21,6 +33,7 @@ export default function App() {
         Ping
       </button>
       <p className="mt-6">{reply}</p>
+      <p className="mt-2">{dbInfo}</p>
     </div>
   )
 }

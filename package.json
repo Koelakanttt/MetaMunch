@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "spike:sqlite": "cross-env ELECTRON_RUN_AS_NODE=1 electron scripts/sqlite-spike.cjs"
   },
   "repository": {
     "type": "git",
@@ -37,6 +38,7 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",
+    "cross-env": "10.1.0",
     "electron": "45.0.0",
     "electron-vite": "6.0.0",
     "eslint": "9.39.5",

@@ -1,6 +1,9 @@
 import { join } from 'node:path'
 import { app, BrowserWindow } from 'electron'
-import { handlers } from './ipc/handlers'
+import { migrations } from './db/migrations'
+import { runMigrations } from './db/migrate'
+import { openDb } from './db/open'
+import { createHandlers } from './ipc/handlers'
 import { registerIpc } from './ipc/register'
 
 function createWindow(): void {
@@ -24,8 +27,14 @@ function createWindow(): void {
 }
 
 void app.whenReady().then(() => {
-  registerIpc(handlers)
+  const db = openDb(join(app.getPath('userData'), 'metamunch.db'))
+  runMigrations(db, migrations)
+  registerIpc(createHandlers({ db }))
   createWindow()
+
+  app.on('will-quit', () => {
+    db.close()
+  })
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

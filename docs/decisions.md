@@ -26,3 +26,5 @@ Region routing: EUW (platform euw1, regional europe). Key from `.env` (RIOT_API_
 
 ## Sources
 Public data only. League of Graphs is not used. Lolalytics only in M5, one request at a time with 1–2 s pause, honest User-Agent, cache per patch, on 403/429/captcha do not bypass: fall back to own sample. Never commit scraped data; never send it to an LLM.
+
+Each milestone adds its own numbered migration; never edit an applied migration.
