@@ -15,19 +15,22 @@ describe('db migrations', () => {
   it('applies migrations', () => {
     const db = openDb(':memory:')
 
-    expect(runMigrations(db, migrations)).toBe(2)
-    expect(getSchemaVersion(db)).toBe(2)
+    expect(runMigrations(db, migrations)).toBe(3)
+    expect(getSchemaVersion(db)).toBe(3)
     expect(tableNames(db)).toContain('patches')
     expect(tableNames(db)).toContain('settings')
     expect(tableNames(db)).toContain('champions')
     expect(tableNames(db)).toContain('items')
+    expect(tableNames(db)).toContain('accounts')
+    expect(tableNames(db)).toContain('matches')
+    expect(tableNames(db)).toContain('participants')
   })
 
   it('is idempotent', () => {
     const db = openDb(':memory:')
 
-    expect(runMigrations(db, migrations)).toBe(2)
-    expect(runMigrations(db, migrations)).toBe(2)
+    expect(runMigrations(db, migrations)).toBe(3)
+    expect(runMigrations(db, migrations)).toBe(3)
   })
 
   it('round trips settings', () => {

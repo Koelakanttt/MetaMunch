@@ -1,11 +1,13 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { IpcHandlers } from '@shared/ipc'
 import { getSchemaVersion } from '../db/migrate'
+import type { MatchSyncService } from '../services/match-sync-service'
 import type { StaticDataService } from '../services/static-data-service'
 
 export function createHandlers(deps: {
   db: DatabaseSync
   staticData: StaticDataService
+  matchSync: MatchSyncService
 }): IpcHandlers {
   return {
     'app:ping': ({ message }) => ({ reply: 'pong: ' + message, at: Date.now() }),
@@ -31,5 +33,11 @@ export function createHandlers(deps: {
       }
     },
     'staticData:refresh': () => deps.staticData.refresh(),
+    'account:set': async ({ riotId }) => {
+      const account = await deps.matchSync.setAccount(riotId)
+      return { gameName: account.gameName, tagLine: account.tagLine }
+    },
+    'matches:status': () => deps.matchSync.status(),
+    'matches:sync': () => deps.matchSync.sync(),
   }
 }

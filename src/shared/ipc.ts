@@ -3,6 +3,9 @@ export interface IpcChannels {
   'db:info': { req: Record<string, never>; res: { schemaVersion: number; sqliteVersion: string } }
   'staticData:status': { req: Record<string, never>; res: { version: string | null; champions: number; items: number; fetchedAt: number | null } }
   'staticData:refresh': { req: Record<string, never>; res: { version: string; fromCache: boolean; champions: number; items: number } }
+  'account:set': { req: { riotId: string }; res: { gameName: string; tagLine: string } }
+  'matches:status': { req: Record<string, never>; res: { account: { gameName: string; tagLine: string } | null; matches: number; lastGameCreation: number | null } }
+  'matches:sync': { req: Record<string, never>; res: { requested: number; saved: number; skippedExisting: number; failed: number } }
 }
 export type IpcChannel = keyof IpcChannels
 export type IpcReq<C extends IpcChannel> = IpcChannels[C]['req']

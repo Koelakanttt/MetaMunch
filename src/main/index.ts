@@ -3,10 +3,21 @@ import { app, BrowserWindow } from 'electron'
 import { migrations } from './db/migrations'
 import { runMigrations } from './db/migrate'
 import { openDb } from './db/open'
+import { getRiotApiKey, loadEnv } from './env'
 import { createHandlers } from './ipc/handlers'
 import { registerIpc } from './ipc/register'
 import { HttpDataDragonProvider } from './providers/http-data-dragon'
+import { HttpRiotApiProvider } from './providers/http-riot-api'
+import { MissingKeyRiotApiProvider } from './providers/missing-key-riot-api'
+import { MatchSyncService } from './services/match-sync-service'
 import { StaticDataService } from './services/static-data-service'
+
+loadEnv(app.getAppPath())
+
+const riotApiKey = getRiotApiKey()
+const riotProvider = riotApiKey
+  ? new HttpRiotApiProvider({ apiKey: riotApiKey })
+  : new MissingKeyRiotApiProvider()
 
 function createWindow(): void {
   const window = new BrowserWindow({
@@ -32,7 +43,8 @@ void app.whenReady().then(() => {
   const db = openDb(join(app.getPath('userData'), 'metamunch.db'))
   runMigrations(db, migrations)
   const staticData = new StaticDataService({ db, provider: new HttpDataDragonProvider() })
-  registerIpc(createHandlers({ db, staticData }))
+  const matchSync = new MatchSyncService({ db, provider: riotProvider })
+  registerIpc(createHandlers({ db, staticData, matchSync }))
   createWindow()
 
   app.on('will-quit', () => {

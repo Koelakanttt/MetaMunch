@@ -1,0 +1,642 @@
+{
+  "metadata": {
+    "dataVersion": "2",
+    "matchId": "EUW1_7000000001",
+    "participants": [
+      "puuid-other-0000",
+      "puuid-other-0001",
+      "puuid-me-0001",
+      "puuid-other-0003",
+      "puuid-other-0004",
+      "puuid-other-0005",
+      "puuid-other-0006",
+      "puuid-other-0007",
+      "puuid-other-0008",
+      "puuid-other-0009"
+    ]
+  },
+  "info": {
+    "gameCreation": 1761350000000,
+    "gameDuration": 1805,
+    "gameMode": "CLASSIC",
+    "gameVersion": "16.21.600.1234",
+    "queueId": 420,
+    "mapId": 11,
+    "participants": [
+      {
+        "puuid": "puuid-other-0000",
+        "teamId": 100,
+        "championId": 103,
+        "championName": "Synthetic",
+        "teamPosition": "TOP",
+        "individualPosition": "TOP",
+        "win": true,
+        "item0": 3089,
+        "item1": 3020,
+        "item2": 3165,
+        "item3": 0,
+        "item4": 0,
+        "item5": 1001,
+        "item6": 3340,
+        "summoner1Id": 4,
+        "summoner2Id": 14,
+        "summonerName": "",
+        "riotIdGameName": "x",
+        "riotIdTagline": "EUW",
+        "kills": 5,
+        "deaths": 2,
+        "assists": 7,
+        "goldEarned": 12000,
+        "challenges": {
+          "soloKills": 1
+        },
+        "perks": {
+          "statPerks": {
+            "defense": 5002,
+            "flex": 5008,
+            "offense": 5005
+          },
+          "styles": [
+            {
+              "description": "primaryStyle",
+              "style": 8100,
+              "selections": [
+                {
+                  "perk": 8112,
+                  "var1": 1,
+                  "var2": 2,
+                  "var3": 3
+                },
+                {
+                  "perk": 8139
+                }
+              ]
+            },
+            {
+              "description": "subStyle",
+              "style": 8200,
+              "selections": [
+                {
+                  "perk": 8226
+                },
+                {
+                  "perk": 8210
+                }
+              ]
+            }
+          ]
+        },
+        "gameEndedInEarlySurrender": false
+      },
+      {
+        "puuid": "puuid-other-0001",
+        "teamId": 100,
+        "championId": 86,
+        "championName": "Synthetic",
+        "teamPosition": "JUNGLE",
+        "individualPosition": "JUNGLE",
+        "win": true,
+        "item0": 3090,
+        "item1": 3020,
+        "item2": 3165,
+        "item3": 0,
+        "item4": 0,
+        "item5": 1001,
+        "item6": 3340,
+        "summoner1Id": 4,
+        "summoner2Id": 14,
+        "summonerName": "",
+        "riotIdGameName": "x",
+        "riotIdTagline": "EUW",
+        "kills": 5,
+        "deaths": 2,
+        "assists": 7,
+        "goldEarned": 12000,
+        "challenges": {
+          "soloKills": 1
+        },
+        "perks": {
+          "statPerks": {
+            "defense": 5002,
+            "flex": 5008,
+            "offense": 5005
+          },
+          "styles": [
+            {
+              "description": "primaryStyle",
+              "style": 8100,
+              "selections": [
+                {
+                  "perk": 8112,
+                  "var1": 1,
+                  "var2": 2,
+                  "var3": 3
+                },
+                {
+                  "perk": 8139
+                }
+              ]
+            },
+            {
+              "description": "subStyle",
+              "style": 8200,
+              "selections": [
+                {
+                  "perk": 8226
+                },
+                {
+                  "perk": 8210
+                }
+              ]
+            }
+          ]
+        },
+        "gameEndedInEarlySurrender": false
+      },
+      {
+        "puuid": "puuid-me-0001",
+        "teamId": 100,
+        "championId": 62,
+        "championName": "Synthetic",
+        "teamPosition": "MIDDLE",
+        "individualPosition": "MIDDLE",
+        "win": true,
+        "item0": 3091,
+        "item1": 3020,
+        "item2": 3165,
+        "item3": 0,
+        "item4": 0,
+        "item5": 1001,
+        "item6": 3340,
+        "summoner1Id": 4,
+        "summoner2Id": 14,
+        "summonerName": "",
+        "riotIdGameName": "x",
+        "riotIdTagline": "EUW",
+        "kills": 5,
+        "deaths": 2,
+        "assists": 7,
+        "goldEarned": 12000,
+        "challenges": {
+          "soloKills": 1
+        },
+        "perks": {
+          "statPerks": {
+            "defense": 5002,
+            "flex": 5008,
+            "offense": 5005
+          },
+          "styles": [
+            {
+              "description": "primaryStyle",
+              "style": 8100,
+              "selections": [
+                {
+                  "perk": 8112,
+                  "var1": 1,
+                  "var2": 2,
+                  "var3": 3
+                },
+                {
+                  "perk": 8139
+                }
+              ]
+            },
+            {
+              "description": "subStyle",
+              "style": 8200,
+              "selections": [
+                {
+                  "perk": 8226
+                },
+                {
+                  "perk": 8210
+                }
+              ]
+            }
+          ]
+        },
+        "gameEndedInEarlySurrender": false
+      },
+      {
+        "puuid": "puuid-other-0003",
+        "teamId": 100,
+        "championId": 22,
+        "championName": "Synthetic",
+        "teamPosition": "BOTTOM",
+        "individualPosition": "BOTTOM",
+        "win": true,
+        "item0": 3092,
+        "item1": 3020,
+        "item2": 3165,
+        "item3": 0,
+        "item4": 0,
+        "item5": 1001,
+        "item6": 3340,
+        "summoner1Id": 4,
+        "summoner2Id": 14,
+        "summonerName": "",
+        "riotIdGameName": "x",
+        "riotIdTagline": "EUW",
+        "kills": 5,
+        "deaths": 2,
+        "assists": 7,
+        "goldEarned": 12000,
+        "challenges": {
+          "soloKills": 1
+        },
+        "perks": {
+          "statPerks": {
+            "defense": 5002,
+            "flex": 5008,
+            "offense": 5005
+          },
+          "styles": [
+            {
+              "description": "primaryStyle",
+              "style": 8100,
+              "selections": [
+                {
+                  "perk": 8112,
+                  "var1": 1,
+                  "var2": 2,
+                  "var3": 3
+                },
+                {
+                  "perk": 8139
+                }
+              ]
+            },
+            {
+              "description": "subStyle",
+              "style": 8200,
+              "selections": [
+                {
+                  "perk": 8226
+                },
+                {
+                  "perk": 8210
+                }
+              ]
+            }
+          ]
+        },
+        "gameEndedInEarlySurrender": false
+      },
+      {
+        "puuid": "puuid-other-0004",
+        "teamId": 100,
+        "championId": 412,
+        "championName": "Synthetic",
+        "teamPosition": "UTILITY",
+        "individualPosition": "UTILITY",
+        "win": true,
+        "item0": 3093,
+        "item1": 3020,
+        "item2": 3165,
+        "item3": 0,
+        "item4": 0,
+        "item5": 1001,
+        "item6": 3340,
+        "summoner1Id": 4,
+        "summoner2Id": 14,
+        "summonerName": "",
+        "riotIdGameName": "x",
+        "riotIdTagline": "EUW",
+        "kills": 5,
+        "deaths": 2,
+        "assists": 7,
+        "goldEarned": 12000,
+        "challenges": {
+          "soloKills": 1
+        },
+        "perks": {
+          "statPerks": {
+            "defense": 5002,
+            "flex": 5008,
+            "offense": 5005
+          },
+          "styles": [
+            {
+              "description": "primaryStyle",
+              "style": 8100,
+              "selections": [
+                {
+                  "perk": 8112,
+                  "var1": 1,
+                  "var2": 2,
+                  "var3": 3
+                },
+                {
+                  "perk": 8139
+                }
+              ]
+            },
+            {
+              "description": "subStyle",
+              "style": 8200,
+              "selections": [
+                {
+                  "perk": 8226
+                },
+                {
+                  "perk": 8210
+                }
+              ]
+            }
+          ]
+        },
+        "gameEndedInEarlySurrender": false
+      },
+      {
+        "puuid": "puuid-other-0005",
+        "teamId": 200,
+        "championId": 266,
+        "championName": "Synthetic",
+        "teamPosition": "TOP",
+        "individualPosition": "TOP",
+        "win": false,
+        "item0": 3094,
+        "item1": 3020,
+        "item2": 3165,
+        "item3": 0,
+        "item4": 0,
+        "item5": 1001,
+        "item6": 3340,
+        "summoner1Id": 4,
+        "summoner2Id": 14,
+        "summonerName": "",
+        "riotIdGameName": "x",
+        "riotIdTagline": "EUW",
+        "kills": 5,
+        "deaths": 2,
+        "assists": 7,
+        "goldEarned": 12000,
+        "challenges": {
+          "soloKills": 1
+        },
+        "perks": {
+          "statPerks": {
+            "defense": 5002,
+            "flex": 5008,
+            "offense": 5005
+          },
+          "styles": [
+            {
+              "description": "primaryStyle",
+              "style": 8100,
+              "selections": [
+                {
+                  "perk": 8112,
+                  "var1": 1,
+                  "var2": 2,
+                  "var3": 3
+                },
+                {
+                  "perk": 8139
+                }
+              ]
+            },
+            {
+              "description": "subStyle",
+              "style": 8200,
+              "selections": [
+                {
+                  "perk": 8226
+                },
+                {
+                  "perk": 8210
+                }
+              ]
+            }
+          ]
+        },
+        "gameEndedInEarlySurrender": false
+      },
+      {
+        "puuid": "puuid-other-0006",
+        "teamId": 200,
+        "championId": 64,
+        "championName": "Synthetic",
+        "teamPosition": "JUNGLE",
+        "individualPosition": "JUNGLE",
+        "win": false,
+        "item0": 3095,
+        "item1": 3020,
+        "item2": 3165,
+        "item3": 0,
+        "item4": 0,
+        "item5": 1001,
+        "item6": 3340,
+        "summoner1Id": 4,
+        "summoner2Id": 14,
+        "summonerName": "",
+        "riotIdGameName": "x",
+        "riotIdTagline": "EUW",
+        "kills": 5,
+        "deaths": 2,
+        "assists": 7,
+        "goldEarned": 12000,
+        "challenges": {
+          "soloKills": 1
+        },
+        "perks": {
+          "statPerks": {
+            "defense": 5002,
+            "flex": 5008,
+            "offense": 5005
+          },
+          "styles": [
+            {
+              "description": "primaryStyle",
+              "style": 8100,
+              "selections": [
+                {
+                  "perk": 8112,
+                  "var1": 1,
+                  "var2": 2,
+                  "var3": 3
+                },
+                {
+                  "perk": 8139
+                }
+              ]
+            },
+            {
+              "description": "subStyle",
+              "style": 8200,
+              "selections": [
+                {
+                  "perk": 8226
+                },
+                {
+                  "perk": 8210
+                }
+              ]
+            }
+          ]
+        },
+        "gameEndedInEarlySurrender": false
+      },
+      {
+        "puuid": "puuid-other-0007",
+        "teamId": 200,
+        "championId": 238,
+        "championName": "Synthetic",
+        "teamPosition": "MIDDLE",
+        "individualPosition": "MIDDLE",
+        "win": false,
+        "item0": 3096,
+        "item1": 3020,
+        "item2": 3165,
+        "item3": 0,
+        "item4": 0,
+        "item5": 1001,
+        "item6": 3340,
+        "summoner1Id": 4,
+        "summoner2Id": 14,
+        "summonerName": "",
+        "riotIdGameName": "x",
+        "riotIdTagline": "EUW",
+        "kills": 5,
+        "deaths": 2,
+        "assists": 7,
+        "goldEarned": 12000,
+        "challenges": {
+          "soloKills": 1
+        },
+        "perks": {
+          "statPerks": {
+            "defense": 5002,
+            "flex": 5008,
+            "offense": 5005
+          },
+          "styles": [
+            {
+              "description": "primaryStyle",
+              "style": 8100,
+              "selections": [
+                {
+                  "perk": 8112,
+                  "var1": 1,
+                  "var2": 2,
+                  "var3": 3
+                },
+                {
+                  "perk": 8139
+                }
+              ]
+            },
+            {
+              "description": "subStyle",
+              "style": 8200,
+              "selections": [
+                {
+                  "perk": 8226
+                },
+                {
+                  "perk": 8210
+                }
+              ]
+            }
+          ]
+        },
+        "gameEndedInEarlySurrender": false
+      },
+      {
+        "puuid": "puuid-other-0008",
+        "teamId": 200,
+        "championId": 51,
+        "championName": "Synthetic",
+        "teamPosition": "BOTTOM",
+        "individualPosition": "BOTTOM",
+        "win": false,
+        "item0": 3097,
+        "item1": 3020,
+        "item2": 3165,
+        "item3": 0,
+        "item4": 0,
+        "item5": 1001,
+        "item6": 3340,
+        "summoner1Id": 4,
+        "summoner2Id": 14,
+        "summonerName": "",
+        "riotIdGameName": "x",
+        "riotIdTagline": "EUW",
+        "kills": 5,
+        "deaths": 2,
+        "assists": 7,
+        "goldEarned": 12000,
+        "challenges": {
+          "soloKills": 1
+        },
+        "perks": {
+          "statPerks": {
+            "defense": 5002,
+            "flex": 5008,
+            "offense": 5005
+          },
+          "styles": [
+            {
+              "description": "primaryStyle",
+              "style": 8100,
+              "selections": [
+                {
+                  "perk": 8112,
+                  "var1": 1,
+                  "var2": 2,
+                  "var3": 3
+                },
+                {
+                  "perk": 8139
+                }
+              ]
+            },
+            {
+              "description": "subStyle",
+              "style": 8200,
+              "selections": [
+                {
+                  "perk": 8226
+                },
+                {
+                  "perk": 8210
+                }
+              ]
+            }
+          ]
+        },
+        "gameEndedInEarlySurrender": false
+      },
+      {
+        "puuid": "puuid-other-0009",
+        "teamId": 200,
+        "championId": 117,
+        "championName": "Synthetic",
+        "teamPosition": "",
+        "individualPosition": "Invalid",
+        "win": false,
+        "item0": 3098,
+        "item1": 3020,
+        "item2": 3165,
+        "item3": 0,
+        "item4": 0,
+        "item5": 1001,
+        "item6": 3340,
+        "summoner1Id": 4,
+        "summoner2Id": 14,
+        "summonerName": "",
+        "riotIdGameName": "x",
+        "riotIdTagline": "EUW",
+        "kills": 5,
+        "deaths": 2,
+        "assists": 7,
+        "goldEarned": 12000,
+        "challenges": {
+          "soloKills": 1
+        },
+        "gameEndedInEarlySurrender": false
+      }
+    ]
+  }
+}
