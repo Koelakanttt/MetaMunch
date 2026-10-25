@@ -5,6 +5,8 @@ import { runMigrations } from './db/migrate'
 import { openDb } from './db/open'
 import { createHandlers } from './ipc/handlers'
 import { registerIpc } from './ipc/register'
+import { HttpDataDragonProvider } from './providers/http-data-dragon'
+import { StaticDataService } from './services/static-data-service'
 
 function createWindow(): void {
   const window = new BrowserWindow({
@@ -29,7 +31,8 @@ function createWindow(): void {
 void app.whenReady().then(() => {
   const db = openDb(join(app.getPath('userData'), 'metamunch.db'))
   runMigrations(db, migrations)
-  registerIpc(createHandlers({ db }))
+  const staticData = new StaticDataService({ db, provider: new HttpDataDragonProvider() })
+  registerIpc(createHandlers({ db, staticData }))
   createWindow()
 
   app.on('will-quit', () => {

@@ -1,3 +1,7 @@
 import type { Migration } from '../migrate'
 import init from './0001_init.sql?raw'
-export const migrations: readonly Migration[] = [{ version: 1, sql: init }]
+import staticData from './0002_static_data.sql?raw'
+export const migrations: readonly Migration[] = [
+  { version: 1, sql: init },
+  { version: 2, sql: staticData },
+]
