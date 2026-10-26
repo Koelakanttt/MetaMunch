@@ -1,5 +1,8 @@
+import { z } from 'zod'
 import type { Champion, Item, ParseResult } from '@shared/ddragon'
 import { parseChampionList, parseItemList, parseRealmVersion } from '@shared/ddragon'
+import type { ChampionDetail } from '@shared/ddragon-detail'
+import { parseChampionDetail } from '@shared/ddragon-detail'
 import type { DataDragonProvider } from './data-dragon'
 
 export interface HttpDataDragonOptions {
@@ -10,6 +13,8 @@ export interface HttpDataDragonOptions {
   userAgent?: string
   timeoutMs?: number
 }
+
+const VersionsSchema = z.array(z.string())
 
 export class HttpDataDragonProvider implements DataDragonProvider {
   private readonly fetchFn: typeof fetch
@@ -41,6 +46,15 @@ export class HttpDataDragonProvider implements DataDragonProvider {
   async getItems(version: string): Promise<ParseResult<Item>> {
     const url = `${this.baseUrl}/cdn/${version}/data/${this.locale}/item.json`
     return parseItemList(await this.getJson(url))
+  }
+
+  async getVersions(): Promise<string[]> {
+    return VersionsSchema.parse(await this.getJson(`${this.baseUrl}/api/versions.json`))
+  }
+
+  async getChampionDetail(version: string, championId: string): Promise<ChampionDetail> {
+    const url = `${this.baseUrl}/cdn/${version}/data/${this.locale}/champion/${championId}.json`
+    return parseChampionDetail(await this.getJson(url), championId)
   }
 
   private async getJson(url: string): Promise<unknown> {

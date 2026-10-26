@@ -72,26 +72,49 @@ export function savePatch(
   }
 }
 
+function compareVersions(a: string, b: string): number {
+  const partsA = a.split('.').map(Number)
+  const partsB = b.split('.').map(Number)
+  const length = Math.max(partsA.length, partsB.length)
+  for (let index = 0; index < length; index += 1) {
+    const left = partsA[index] ?? 0
+    const right = partsB[index] ?? 0
+    if (left !== right) return left - right
+  }
+  return 0
+}
+
 export function getLatestPatch(db: DatabaseSync): PatchStatus | null {
-  const row = db
+  const rows = db.prepare('SELECT version, fetched_at FROM patches').all() as {
+    version?: unknown
+    fetched_at?: unknown
+  }[]
+  if (rows.length === 0) return null
+
+  let latest: { version: string; fetchedAt: number } | null = null
+  for (const row of rows) {
+    const version = String(row.version)
+    const fetchedAt = Number(row.fetched_at)
+    if (!latest || compareVersions(version, latest.version) > 0) {
+      latest = { version, fetchedAt }
+    }
+  }
+  if (!latest) return null
+
+  const counts = db
     .prepare(
-      `SELECT p.version AS version,
-              p.fetched_at AS fetched_at,
-              (SELECT count(*) FROM champions c WHERE c.patch = p.version) AS champions,
-              (SELECT count(*) FROM items i WHERE i.patch = p.version) AS items
-       FROM patches p
-       ORDER BY p.fetched_at DESC, p.version DESC
-       LIMIT 1`,
+      `SELECT (SELECT count(*) FROM champions WHERE patch = ?) AS champions,
+              (SELECT count(*) FROM items WHERE patch = ?) AS items`,
     )
-    .get() as
-    | { version?: unknown; fetched_at?: unknown; champions?: unknown; items?: unknown }
+    .get(latest.version, latest.version) as
+    | { champions?: unknown; items?: unknown }
     | undefined
-  if (!row) return null
+
   return {
-    version: String(row.version),
-    fetchedAt: Number(row.fetched_at),
-    champions: Number(row.champions),
-    items: Number(row.items),
+    version: latest.version,
+    fetchedAt: latest.fetchedAt,
+    champions: Number(counts?.champions ?? 0),
+    items: Number(counts?.items ?? 0),
   }
 }
 

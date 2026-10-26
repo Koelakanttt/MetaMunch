@@ -39,4 +39,39 @@ describe('HttpDataDragonProvider', () => {
 
     await expect(provider.getLatestVersion()).rejects.toThrow('HTTP 503')
   })
+
+  it('fetches versions and champion details', async () => {
+    const versionsUrl = 'https://ddragon.leagueoflegends.com/api/versions.json'
+    const detailUrl =
+      'https://ddragon.leagueoflegends.com/cdn/16.21.1/data/en_US/champion/Camille.json'
+    const detail = JSON.stringify({
+      data: {
+        Camille: {
+          id: 'Camille',
+          name: 'Camille',
+          stats: { hp: 650 },
+          passive: { name: 'Adaptive Defenses' },
+          spells: [],
+        },
+      },
+    })
+
+    const calls: string[] = []
+    const fetchFn: typeof fetch = async (input) => {
+      const url = String(input)
+      calls.push(url)
+      if (url === versionsUrl) return new Response(JSON.stringify(['16.21.1', '16.20.1']))
+      if (url === detailUrl) return new Response(detail)
+      return new Response('missing', { status: 404 })
+    }
+
+    const provider = new HttpDataDragonProvider({ fetchFn })
+
+    expect(await provider.getVersions()).toEqual(['16.21.1', '16.20.1'])
+    const parsed = await provider.getChampionDetail('16.21.1', 'Camille')
+    expect(parsed.name).toBe('Camille')
+    expect(parsed.stats.hp).toBe(650)
+    expect(parsed.passiveName).toBe('Adaptive Defenses')
+    expect(calls).toEqual([versionsUrl, detailUrl])
+  })
 })

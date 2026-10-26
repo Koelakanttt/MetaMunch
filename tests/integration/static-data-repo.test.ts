@@ -44,6 +44,20 @@ describe('static data repo', () => {
     expect(listItems(db, '16.3.1')).toEqual(items)
   })
 
+  it('picks the highest version regardless of fetch time', () => {
+    const db = migratedDb()
+
+    savePatch(db, '16.9.1', [], [], 2000)
+    savePatch(db, '16.21.1', [], [], 1000)
+
+    expect(getLatestPatch(db)).toEqual({
+      version: '16.21.1',
+      fetchedAt: 1000,
+      champions: 0,
+      items: 0,
+    })
+  })
+
   it('throws when the same patch is saved twice', () => {
     const db = migratedDb()
     savePatch(db, '16.3.1', champions, items, 123)

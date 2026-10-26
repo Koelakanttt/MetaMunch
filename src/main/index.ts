@@ -13,6 +13,7 @@ import { HttpDataDragonProvider } from './providers/http-data-dragon'
 import { HttpRiotApiProvider } from './providers/http-riot-api'
 import { MissingKeyRiotApiProvider } from './providers/missing-key-riot-api'
 import { MatchSyncService } from './services/match-sync-service'
+import { PatchChangesService } from './services/patch-changes-service'
 import { PersonalStatsService } from './services/personal-stats-service'
 import { RecommendationService } from './services/recommendation-service'
 import { StaticDataService } from './services/static-data-service'
@@ -47,24 +48,28 @@ function createWindow(): void {
 void app.whenReady().then(() => {
   const db = openDb(join(app.getPath('userData'), 'metamunch.db'))
   runMigrations(db, migrations)
-  const staticData = new StaticDataService({ db, provider: new HttpDataDragonProvider() })
+  const dataDragon = new HttpDataDragonProvider()
+  const staticData = new StaticDataService({ db, provider: dataDragon })
   const matchSync = new MatchSyncService({ db, provider: riotProvider })
-  const personal = new PersonalStatsService({
-    db,
-    getAccount: () => {
-      const account = getAccount(db)
-      return account
-        ? { puuid: account.puuid, gameName: account.gameName, tagLine: account.tagLine }
-        : null
-    },
-  })
+  const getTrackedAccount = () => {
+    const account = getAccount(db)
+    return account
+      ? { puuid: account.puuid, gameName: account.gameName, tagLine: account.tagLine }
+      : null
+  }
+  const personal = new PersonalStatsService({ db, getAccount: getTrackedAccount })
   const recommendation = new RecommendationService({
     source: createDbSource(db),
     rules: loadRules(),
     tags: loadChampionTags(),
     personal,
   })
-  registerIpc(createHandlers({ db, staticData, matchSync, recommendation }))
+  const patchChanges = new PatchChangesService({
+    db,
+    provider: dataDragon,
+    getAccount: getTrackedAccount,
+  })
+  registerIpc(createHandlers({ db, staticData, matchSync, recommendation, patchChanges }))
   createWindow()
 
   app.on('will-quit', () => {

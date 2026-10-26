@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { PatchChangesPage } from './pages/PatchChangesPage'
 import { RecommendPage } from './pages/RecommendPage'
 
 interface StaticDataStatus {
@@ -122,6 +123,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-900 p-8 text-slate-100">
       <h1 className="text-3xl font-semibold">MetaMunch</h1>
       <RecommendPage refreshKey={refreshKey} />
+      <PatchChangesPage />
       <button
         type="button"
         className="mt-6 rounded bg-slate-700 px-4 py-2 hover:bg-slate-600"

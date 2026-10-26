@@ -1,3 +1,4 @@
+import type { PatchChangesResponse } from './patch-diff'
 import type { ChampionListResponse, RecommendRequest, RecommendResponse } from './recommend-api'
 
 export interface IpcChannels {
@@ -10,6 +11,7 @@ export interface IpcChannels {
   'matches:sync': { req: Record<string, never>; res: { requested: number; saved: number; skippedExisting: number; failed: number } }
   'champions:list': { req: Record<string, never>; res: ChampionListResponse }
   'recommend:run': { req: RecommendRequest; res: RecommendResponse }
+  'patch:changes': { req: Record<string, never>; res: PatchChangesResponse }
 }
 export type IpcChannel = keyof IpcChannels
 export type IpcReq<C extends IpcChannel> = IpcChannels[C]['req']

@@ -7,6 +7,7 @@ import { createHandlers } from '../../src/main/ipc/handlers'
 import type { DataDragonProvider } from '../../src/main/providers/data-dragon'
 import type { RiotApiProvider } from '../../src/main/providers/riot-api'
 import { MatchSyncService } from '../../src/main/services/match-sync-service'
+import { PatchChangesService } from '../../src/main/services/patch-changes-service'
 import { RecommendationService } from '../../src/main/services/recommendation-service'
 import type { StaticDataSource } from '../../src/main/services/recommendation-service'
 import { StaticDataService } from '../../src/main/services/static-data-service'
@@ -15,6 +16,10 @@ const dataDragonProvider: DataDragonProvider = {
   getLatestVersion: async () => '16.3.1',
   getChampions: async () => ({ values: [], skipped: [] }),
   getItems: async () => ({ values: [], skipped: [] }),
+  getVersions: async () => [],
+  getChampionDetail: async () => {
+    throw new Error('not used')
+  },
 }
 
 const riotProvider: RiotApiProvider = {
@@ -40,7 +45,12 @@ const recommendation = new RecommendationService({
   rules: loadRules(),
   tags: loadChampionTags(),
 })
-const handlers = createHandlers({ db, staticData, matchSync, recommendation })
+const patchChanges = new PatchChangesService({
+  db,
+  provider: dataDragonProvider,
+  getAccount: () => null,
+})
+const handlers = createHandlers({ db, staticData, matchSync, recommendation, patchChanges })
 
 describe('ipc handlers', () => {
   it('answers app:ping with pong and a timestamp', async () => {
@@ -53,7 +63,7 @@ describe('ipc handlers', () => {
   it('reports db info', async () => {
     const res = await handlers['db:info']({})
 
-    expect(res.schemaVersion).toBe(4)
+    expect(res.schemaVersion).toBe(5)
     expect(res.sqliteVersion).toMatch(/^3\./)
   })
 
@@ -65,5 +75,11 @@ describe('ipc handlers', () => {
     expect(() =>
       handlers['recommend:run']({ meId: 'Garen', role: 'TOP', enemyIds: [] }),
     ).toThrow('Update data')
+  })
+
+  it('reports patch changes without an account', async () => {
+    const res = await handlers['patch:changes']({})
+
+    expect(res.notes).toEqual(['No account set.'])
   })
 })

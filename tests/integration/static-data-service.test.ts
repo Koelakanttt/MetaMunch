@@ -37,6 +37,10 @@ describe('StaticDataService', () => {
         calls.items += 1
         return { values: items, skipped: [] }
       },
+      getVersions: async () => [],
+      getChampionDetail: async () => {
+        throw new Error('not used')
+      },
     }
 
     const service = new StaticDataService({ db: migratedDb(), provider, now: () => 42 })
@@ -64,6 +68,10 @@ describe('StaticDataService', () => {
       getChampions: async () => ({ values: champions, skipped: [] }),
       getItems: async () => {
         throw new Error('boom')
+      },
+      getVersions: async () => [],
+      getChampionDetail: async () => {
+        throw new Error('not used')
       },
     }
 
