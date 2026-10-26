@@ -9,3 +9,4 @@
 - M3a files written, awaiting owner checks
 - M3b files written, awaiting owner checks
 - M3b lint fix (RecommendPage effect)
+- M3c files written, awaiting owner checks

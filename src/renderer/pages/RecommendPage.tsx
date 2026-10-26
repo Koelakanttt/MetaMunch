@@ -5,6 +5,7 @@ import type {
   RecommendationView,
   RecommendResponse,
 } from '@shared/recommend-api'
+import type { MatchupEntry, PersonalStats } from '@shared/personal'
 import { ChampionPicker } from '../components/ChampionPicker'
 
 function invokeErrorMessage(reason: unknown): string {
@@ -32,6 +33,60 @@ function RecommendationList({ items }: { items: RecommendationView[] }) {
         </li>
       ))}
     </ol>
+  )
+}
+
+function formatMatchup(entry: MatchupEntry): string {
+  if (entry.games === 0) return `${entry.enemyName}: no games`
+  const base = `${entry.enemyName}: ${entry.games} games, ${entry.wins} wins`
+  return entry.lowSample ? `${base} · low sample` : base
+}
+
+function PersonalStatsBlock({
+  personal,
+  meName,
+}: {
+  personal: PersonalStats | null
+  meName: string
+}) {
+  if (!personal) return <p>Personal stats: no account set.</p>
+
+  const winRate = Math.round((personal.wins / personal.games) * 100)
+
+  return (
+    <div>
+      <h3>Your stats ({personal.account})</h3>
+      {personal.games === 0 ? (
+        <p>No games on {meName} yet.</p>
+      ) : (
+        <p>
+          {`${meName}: ${personal.games} games, ${personal.wins} wins (${winRate}%)`}
+          {personal.lowSample ? ' · low sample' : ''}
+        </p>
+      )}
+      {personal.build.length > 0 ? (
+        <>
+          <p>Your usual build:</p>
+          <ul>
+            {personal.build.map((entry) => (
+              <li key={entry.itemId}>
+                {`${entry.name} — ${entry.games} of ${personal.games} games`}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      {personal.vs.length > 0 ? (
+        <>
+          <p>Against this team:</p>
+          <ul>
+            {personal.vs.map((entry) => (
+              <li key={entry.enemyId}>{formatMatchup(entry)}</li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+    </div>
   )
 }
 
@@ -151,6 +206,7 @@ export function RecommendPage({ refreshKey }: { refreshKey: number }) {
           <RecommendationList items={result.items} />
           <h3>Boots</h3>
           <RecommendationList items={result.boots} />
+          <PersonalStatsBlock personal={result.personal} meName={result.me.name} />
         </div>
       ) : null}
     </section>

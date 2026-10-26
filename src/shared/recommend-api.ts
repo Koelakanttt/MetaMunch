@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { PersonalStats } from './personal'
 import type { Damage, EnemyProfile } from './recommend'
 import { ROLES, type Metric } from './rules'
 
@@ -36,6 +37,7 @@ export interface RecommendResponse {
   profile: { metrics: Record<Metric, number>; names: EnemyProfile['names'] }
   items: RecommendationView[]
   boots: RecommendationView[]
+  personal: PersonalStats | null // null when no account is tracked
 }
 
 /** Validates an untrusted IPC payload. Throws an Error with a readable message. */

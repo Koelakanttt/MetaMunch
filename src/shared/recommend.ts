@@ -45,6 +45,8 @@ export interface RecommendInput {
 export const MAX_ITEMS = 6
 export const MAX_BOOTS = 2
 export const CORE_TARGET = 4
+/** Rule matches below this score are only tie-breakers: they never form a recommendation on their own. */
+export const MIN_RULE_SCORE = 2
 const MAX_REASONS = 2
 /** A Data Dragon "Tank" champion counts as a real tank only with this much defense rating. */
 export const TANK_MIN_DEFENSE = 7
@@ -134,13 +136,28 @@ function ruleApplies(rule: Rule, slot: 'item' | 'boots', role: Role, myDamage: D
   })
 }
 
-function compatible(traits: readonly Trait[], me: Champion, myDamage: Damage): boolean {
+const DEFENSIVE_CLASSES = ['Tank', 'Fighter', 'Support']
+
+/** Tanks, fighters and supports may buy purely defensive items; squishy damage dealers may not. */
+function allowsDefensiveItems(me: Champion): boolean {
+  return me.tags.some((t) => DEFENSIVE_CLASSES.includes(t))
+}
+
+function hasDamageStat(traits: readonly Trait[], myDamage: Damage): boolean {
+  if (traits.includes('adaptive')) return true
+  if (myDamage !== 'ap' && traits.includes('ad')) return true
+  if (myDamage !== 'ad' && traits.includes('ap')) return true
+  return false
+}
+
+function compatible(traits: readonly Trait[], me: Champion, myDamage: Damage, slot: 'item' | 'boots'): boolean {
   // Hybrid items (both AD and AP) and adaptive items suit everyone; pure items only their own damage type.
   if (!traits.includes('adaptive')) {
     if (myDamage === 'ad' && traits.includes('ap') && !traits.includes('ad')) return false
     if (myDamage === 'ap' && traits.includes('ad') && !traits.includes('ap')) return false
   }
   if (me.stats['mp'] === 0 && traits.includes('mana')) return false
+  if (slot === 'item' && !allowsDefensiveItems(me) && !hasDamageStat(traits, myDamage)) return false
   return true
 }
 
@@ -170,7 +187,7 @@ function pickByRules(
     const text = formatReason(rule.reason, profile)
     for (const item of pool) {
       const traits = traitsOf.get(item.id) ?? []
-      if (!compatible(traits, input.me, myDamage)) continue
+      if (!compatible(traits, input.me, myDamage, slot)) continue
       if (!rule.allOf.every((t) => traits.includes(t))) continue
       const matched = rule.anyOf.filter((t) => traits.includes(t)).length
       if (rule.anyOf.length > 0 && matched === 0) continue
@@ -183,6 +200,7 @@ function pickByRules(
     }
   }
   return [...scored.values()]
+    .filter((s) => s.score >= MIN_RULE_SCORE)
     .sort(byScore)
     .slice(0, limit)
     .map((s) => ({
@@ -208,14 +226,24 @@ function pickCore(
   limit: number,
 ): Recommendation[] {
   if (limit <= 0) return []
-  const cls = input.me.tags.find((t) => t in input.rules.coreByClass)
-  const spec = cls ? input.rules.coreByClass[cls] : undefined
-  if (!spec) return []
+  // A key like "Assassin:ap" (class + damage type) wins over the plain class key.
+  let cls: string | undefined
+  let spec: Rules['coreByClass'][string] | undefined
+  for (const tag of input.me.tags) {
+    const specific = input.rules.coreByClass[`${tag}:${myDamage}`]
+    const plain = input.rules.coreByClass[tag]
+    if (specific || plain) {
+      cls = specific ? `${tag}:${myDamage}` : tag
+      spec = specific ?? plain
+      break
+    }
+  }
+  if (!cls || !spec) return []
   const scored: Scored[] = []
   for (const item of pool) {
     if (skip.has(item.id)) continue
     const traits = traitsOf.get(item.id) ?? []
-    if (!compatible(traits, input.me, myDamage)) continue
+    if (!compatible(traits, input.me, myDamage, 'item')) continue
     const matched = spec.traits.filter((t) => traits.includes(t)).length
     if (matched < 2) continue
     scored.push({ item, score: matched, reasons: [{ weight: 1, text: spec.reason }], ruleIds: [`core:${cls}`] })

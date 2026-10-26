@@ -1,6 +1,7 @@
 import { join } from 'node:path'
 import { app, BrowserWindow } from 'electron'
 import { loadChampionTags, loadRules } from './data/rules-data'
+import { getAccount } from './db/matches-repo'
 import { migrations } from './db/migrations'
 import { runMigrations } from './db/migrate'
 import { openDb } from './db/open'
@@ -12,6 +13,7 @@ import { HttpDataDragonProvider } from './providers/http-data-dragon'
 import { HttpRiotApiProvider } from './providers/http-riot-api'
 import { MissingKeyRiotApiProvider } from './providers/missing-key-riot-api'
 import { MatchSyncService } from './services/match-sync-service'
+import { PersonalStatsService } from './services/personal-stats-service'
 import { RecommendationService } from './services/recommendation-service'
 import { StaticDataService } from './services/static-data-service'
 
@@ -47,10 +49,20 @@ void app.whenReady().then(() => {
   runMigrations(db, migrations)
   const staticData = new StaticDataService({ db, provider: new HttpDataDragonProvider() })
   const matchSync = new MatchSyncService({ db, provider: riotProvider })
+  const personal = new PersonalStatsService({
+    db,
+    getAccount: () => {
+      const account = getAccount(db)
+      return account
+        ? { puuid: account.puuid, gameName: account.gameName, tagLine: account.tagLine }
+        : null
+    },
+  })
   const recommendation = new RecommendationService({
     source: createDbSource(db),
     rules: loadRules(),
     tags: loadChampionTags(),
+    personal,
   })
   registerIpc(createHandlers({ db, staticData, matchSync, recommendation }))
   createWindow()

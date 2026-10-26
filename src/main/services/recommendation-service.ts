@@ -7,6 +7,7 @@ import {
   type RecommendResponse,
   type RecommendationView,
 } from '@shared/recommend-api'
+import type { PersonalStats } from '@shared/personal'
 import type { ChampionTags, Rules } from '@shared/rules'
 
 /** Read access to the stored static data of the latest patch. */
@@ -16,10 +17,16 @@ export interface StaticDataSource {
   items(version: string): Item[]
 }
 
+/** Personal statistics of the tracked account (optional part of the response). */
+export interface PersonalStatsProvider {
+  forChampion(me: Champion, enemies: readonly Champion[], items: readonly Item[]): PersonalStats | null
+}
+
 export interface RecommendationServiceDeps {
   source: StaticDataSource
   rules: Rules
   tags: ChampionTags
+  personal?: PersonalStatsProvider
 }
 
 function view(r: Recommendation): RecommendationView {
@@ -58,7 +65,8 @@ export class RecommendationService {
       return champion
     })
 
-    const result = recommend({ me, role: request.role, enemies, items: source.items(version), tags, rules })
+    const items = source.items(version)
+    const result = recommend({ me, role: request.role, enemies, items, tags, rules })
     return {
       version,
       level: result.level,
@@ -66,6 +74,7 @@ export class RecommendationService {
       profile: { metrics: result.profile.metrics, names: result.profile.names },
       items: result.items.map(view),
       boots: result.boots.map(view),
+      personal: this.deps.personal?.forChampion(me, enemies, items) ?? null,
     }
   }
 }

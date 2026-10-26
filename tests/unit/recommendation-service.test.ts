@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Champion, Item } from '../../src/shared/ddragon'
 import { loadChampionTags, loadRules } from '../../src/main/data/rules-data'
-import { RecommendationService, type StaticDataSource } from '../../src/main/services/recommendation-service'
+import { RecommendationService, type PersonalStatsProvider, type StaticDataSource } from '../../src/main/services/recommendation-service'
 import { mkItem, stats } from '../helpers/items'
 
 function champ(id: string, name: string, tags: string[], attack: number, magic: number, defense = 5, mp = 300): Champion {
@@ -26,13 +26,13 @@ const items: Item[] = [
   mkItem(5, 'Chainlaced Crushers', { tags: ['Boots', 'SpellBlock'], description: stats([25, 'Magic Resist']), goldTotal: 1250 }),
 ]
 
-function service(version: string | null = '16.21.1') {
+function service(version: string | null = '16.21.1', personal?: PersonalStatsProvider) {
   const source: StaticDataSource = {
     latestVersion: () => version,
     champions: () => champions,
     items: () => items,
   }
-  return new RecommendationService({ source, rules: loadRules(), tags: loadChampionTags() })
+  return new RecommendationService({ source, rules: loadRules(), tags: loadChampionTags(), ...(personal ? { personal } : {}) })
 }
 
 describe('data loaders', () => {
@@ -87,6 +87,13 @@ describe('RecommendationService.run', () => {
     expect(() => s.run({ ...request, meId: 'Nobody' })).toThrow('Unknown champion: Nobody')
     expect(() => s.run({ ...request, enemyIds: ['Soraka', 'Nobody'] })).toThrow('Unknown champion: Nobody')
     expect(() => s.run({ ...request, enemyIds: ['Soraka', 'Soraka'] })).toThrow('Duplicate enemy champion')
+  })
+  it('has no personal section without a provider and passes the provider result through', () => {
+    expect(service().run(request).personal).toBeNull()
+    const fake: PersonalStatsProvider = {
+      forChampion: (me, enemies) => ({ account: 'x#1', games: me.id === 'Garen' ? enemies.length : 0, wins: 0, lowSample: true, build: [], vs: [] }),
+    }
+    expect(service('16.21.1', fake).run(request).personal?.games).toBe(5)
   })
   it('asks to update the data when nothing is stored', () => {
     expect(() => service(null).run(request)).toThrow('Update data')

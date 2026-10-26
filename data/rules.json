@@ -257,6 +257,22 @@
       "reason": "Enemy damage is mostly magic ({apShare}): magic resist boots."
     },
     {
+      "id": "boots-magic-pen-for-ap",
+      "slot": "boots",
+      "when": [
+        {
+          "metric": "enemies",
+          "atLeast": 1
+        }
+      ],
+      "myDamage": "ap",
+      "anyOf": [
+        "magicPen"
+      ],
+      "weight": 2,
+      "reason": "You deal magic damage: magic penetration boots."
+    },
+    {
       "id": "boots-haste-default",
       "slot": "boots",
       "when": [
@@ -268,7 +284,7 @@
       "anyOf": [
         "abilityHaste"
       ],
-      "weight": 1,
+      "weight": 2,
       "reason": "No special threat in the enemy team: ability haste boots."
     }
   ],
@@ -322,6 +338,24 @@
         "mana"
       ],
       "reason": "Generic core for supports: ability haste, heal and shield power, mana."
+    },
+    "Assassin:ap": {
+      "traits": [
+        "ap",
+        "abilityHaste",
+        "magicPen",
+        "health"
+      ],
+      "reason": "Generic core for AP assassins: ability power with haste, penetration or health."
+    },
+    "Fighter:ap": {
+      "traits": [
+        "ap",
+        "health",
+        "abilityHaste",
+        "magicPen"
+      ],
+      "reason": "Generic core for AP fighters: ability power with health and ability haste."
     }
   }
 }

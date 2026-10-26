@@ -53,6 +53,7 @@ const catalog = [
   mkItem(10, 'Sunfire', { tags: ['Health', 'Armor'], description: stats([400, 'Health'], [50, 'Armor']), goldTotal: 2700 }),
   mkItem(11, 'Manamune', { tags: ['Damage', 'Mana'], description: stats([35, 'Attack Damage'], [500, 'Mana'], [15, 'Ability Haste']), goldTotal: 2900 }),
   mkItem(12, 'Ornn masterwork', { tags: ['Armor'], description: stats([100, 'Armor']), requiredAlly: 'Ornn', goldTotal: 3500 }),
+  mkItem(14, 'Zhonyas Hourglass', { tags: ['SpellDamage', 'Armor'], description: stats([80, 'Ability Power'], [45, 'Armor']), goldTotal: 3250 }),
   mkItem(13, 'Long Sword', { tags: ['Damage'], description: stats([10, 'Attack Damage']), goldTotal: 350 }),
   mkItem(20, 'Plated Steelcaps', { tags: ['Boots', 'Armor'], description: stats([20, 'Armor']), goldTotal: 1100 }),
   mkItem(21, 'Mercurys Treads', { tags: ['Boots', 'SpellBlock', 'Tenacity'], description: stats([25, 'Magic Resist'], ['30%', 'Tenacity and Slow Resist']), goldTotal: 1100 }),
@@ -120,11 +121,32 @@ describe('recommend by rules', () => {
     const r = run(ahri, [aatrox, zed, jinx, darius, garen])
     expect(r.level).toBe('rules')
     const list = names(r.items)
-    expect(list[0]).toBe('Thornmail') // armor + anti-heal (one healer)
-    expect(list).toContain('Randuins')
+    expect(list[0]).toBe('Zhonyas Hourglass') // armor on an AP item
+    expect(list).toContain('Morellonomicon') // AP item with anti-heal (one healer)
+    expect(list).not.toContain('Thornmail') // purely defensive: not for a squishy mage
+    expect(list).not.toContain('Randuins')
     expect(list).not.toContain('Black Cleaver') // AD item for an AP champion
     expect(list).not.toContain('Mortal Reminder')
     expect(names(r.boots)[0]).toBe('Plated Steelcaps')
+  })
+  it('keeps purely defensive items for fighters and tanks but not for squishy champions', () => {
+    const enemies = [zed, jinx, darius, aatrox, garen]
+    expect(names(run(garen, enemies).items)).toContain('Thornmail')
+    expect(names(run(ahri, enemies).items)).not.toContain('Thornmail')
+    expect(names(run(zed, enemies).items)).not.toContain('Randuins')
+  })
+  it('still offers boots to squishy champions and prefers magic penetration boots for AP', () => {
+    const r = run(ahri, [zed, jinx, darius, aatrox, garen])
+    expect(r.boots.length).toBeGreaterThan(0)
+    const mage = recommend({ me: ahri, role: 'MIDDLE', enemies: [leona], items: [...catalog, mkItem(24, 'Sorcerers Shoes', { tags: ['Boots'], description: stats([18, 'Magic Penetration']), goldTotal: 1100 })], tags, rules })
+    expect(names(mage.boots)[0]).toBe('Sorcerers Shoes')
+  })
+  it('uses a class plus damage core for AP assassins', () => {
+    const akali = champ('Akali', ['Assassin'], 5, 8)
+    const r = run(akali, [])
+    expect(r.level).toBe('core')
+    expect(r.items.map((i) => i.ruleIds[0])).toEqual(['core:Assassin:ap'])
+    expect(names(r.items)).toEqual(['Void Staff'])
   })
   it('uses armor penetration against tanks for AD and magic penetration for AP', () => {
     const tanks = [leona, ornn, darius]
@@ -164,7 +186,7 @@ describe('recommend by rules', () => {
   it('respects role restrictions of a rule', () => {
     const custom = parseRules({
       version: 1,
-      rules: [{ id: 'jg', roles: ['JUNGLE'], when: [{ metric: 'enemies', atLeast: 1 }], anyOf: ['armor'], weight: 1, reason: 'r' }],
+      rules: [{ id: 'jg', roles: ['JUNGLE'], when: [{ metric: 'enemies', atLeast: 1 }], anyOf: ['armor'], weight: 2, reason: 'r' }],
     })
     const r = recommend({ me: garen, role: 'TOP', enemies: [jinx], items: catalog, tags, rules: custom })
     expect(r.items).toEqual([])
