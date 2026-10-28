@@ -1,5 +1,5 @@
 import type { Champion, Item } from '@shared/ddragon'
-import { damageClass, recommend, type Recommendation } from '@shared/recommend'
+import { archetypeOf, damageClass, recommend, type Recommendation } from '@shared/recommend'
 import {
   parseRecommendRequest,
   type ChampionListResponse,
@@ -29,8 +29,19 @@ export interface RecommendationServiceDeps {
   personal?: PersonalStatsProvider
 }
 
-function view(r: Recommendation): RecommendationView {
-  return { itemId: r.itemId, name: r.name, source: r.source, reasons: r.reasons, ruleIds: r.ruleIds, score: r.score }
+function view(r: Recommendation, items: ReadonlyMap<number, Item>): RecommendationView {
+  const item = items.get(r.itemId)
+  return {
+    itemId: r.itemId,
+    name: r.name,
+    source: r.source,
+    reasons: r.reasons,
+    ruleIds: r.ruleIds,
+    score: r.score,
+    gold: item?.goldTotal ?? 0,
+    plaintext: item?.plaintext ?? '',
+    stats: item?.stats ?? {},
+  }
 }
 
 export class RecommendationService {
@@ -66,15 +77,28 @@ export class RecommendationService {
     })
 
     const items = source.items(version)
-    const result = recommend({ me, role: request.role, enemies, items, tags, rules })
+    const itemsById = new Map(items.map((item) => [item.id, item]))
+    const personal = this.deps.personal?.forChampion(me, enemies, items) ?? null
+    const prior = personal
+      ? { games: personal.games, build: personal.build.map((b) => ({ name: b.name, games: b.games })) }
+      : undefined
+
+    const result = recommend({ me, role: request.role, enemies, items, tags, rules, prior })
+
     return {
       version,
       level: result.level,
-      me: { id: me.id, name: me.name, damage: damageClass(me, tags) },
+      me: {
+        id: me.id,
+        name: me.name,
+        damage: damageClass(me, tags),
+        archetype: archetypeOf(me, tags),
+      },
       profile: { metrics: result.profile.metrics, names: result.profile.names },
-      items: result.items.map(view),
-      boots: result.boots.map(view),
-      personal: this.deps.personal?.forChampion(me, enemies, items) ?? null,
+      core: result.core.map((item) => view(item, itemsById)),
+      items: result.items.map((item) => view(item, itemsById)),
+      boots: result.boots.map((item) => view(item, itemsById)),
+      personal,
     }
   }
 }

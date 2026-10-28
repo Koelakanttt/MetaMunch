@@ -2,10 +2,17 @@
  "version": 1,
  "champions": {
   "Aatrox": {
-   "healing": true
+   "healing": true,
+   "cc": "hard",
+   "archetype": "bruiser"
+  },
+  "Ahri": {
+   "cc": "hard",
+   "archetype": "mage"
   },
   "Akali": {
-   "damage": "ap"
+   "damage": "ap",
+   "archetype": "assassin"
   },
   "Alistar": {
    "healing": true,
@@ -15,7 +22,19 @@
    "damage": "ap",
    "cc": "hard"
   },
+  "Annie": {
+   "cc": "hard"
+  },
+  "Aphelios": {
+   "cc": "hard"
+  },
   "Ashe": {
+   "cc": "hard"
+  },
+  "Azir": {
+   "cc": "hard"
+  },
+  "Bard": {
    "cc": "hard"
   },
   "Blitzcrank": {
@@ -25,13 +44,27 @@
    "cc": "hard"
   },
   "Briar": {
-   "healing": true
+   "healing": true,
+   "archetype": "bruiser"
+  },
+  "Camille": {
+   "cc": "hard",
+   "archetype": "bruiser"
+  },
+  "Cassiopeia": {
+   "cc": "hard"
   },
   "Corki": {
    "damage": "mixed"
   },
+  "Darius": {
+   "archetype": "bruiser"
+  },
   "Diana": {
    "damage": "ap"
+  },
+  "Draven": {
+   "cc": "hard"
   },
   "DrMundo": {
    "healing": true
@@ -41,26 +74,34 @@
    "cc": "hard"
   },
   "Evelynn": {
-   "damage": "ap"
+   "damage": "ap",
+   "archetype": "assassin"
   },
   "Ezreal": {
    "damage": "mixed"
   },
+  "Fiddlesticks": {
+   "cc": "hard"
+  },
   "Fiora": {
-   "healing": true
+   "healing": true,
+   "archetype": "bruiser"
   },
   "Fizz": {
-   "damage": "ap"
+   "damage": "ap",
+   "archetype": "assassin"
   },
   "Galio": {
    "cc": "hard"
   },
   "Gragas": {
-   "damage": "ap"
+   "damage": "ap",
+   "cc": "hard"
   },
   "Gwen": {
    "damage": "ap",
-   "healing": true
+   "healing": true,
+   "archetype": "bruiser"
   },
   "Hecarim": {
    "cc": "hard"
@@ -68,11 +109,21 @@
   "Illaoi": {
    "healing": true
   },
+  "Irelia": {
+   "archetype": "bruiser"
+  },
+  "Janna": {
+   "cc": "hard"
+  },
   "JarvanIV": {
    "cc": "hard"
   },
   "Jax": {
-   "damage": "mixed"
+   "damage": "mixed",
+   "archetype": "bruiser"
+  },
+  "Katarina": {
+   "archetype": "assassin"
   },
   "Kayle": {
    "damage": "mixed",
@@ -81,6 +132,9 @@
   "Kayn": {
    "healing": true
   },
+  "Khazix": {
+   "archetype": "assassin"
+  },
   "KogMaw": {
    "damage": "mixed"
   },
@@ -88,6 +142,9 @@
    "cc": "hard"
   },
   "Lissandra": {
+   "cc": "hard"
+  },
+  "Lulu": {
    "cc": "hard"
   },
   "Lux": {
@@ -117,6 +174,9 @@
   "Nautilus": {
    "cc": "hard"
   },
+  "Neeko": {
+   "cc": "hard"
+  },
   "Nunu": {
    "cc": "hard"
   },
@@ -136,7 +196,14 @@
    "cc": "hard"
   },
   "Renekton": {
-   "cc": "hard"
+   "cc": "hard",
+   "archetype": "bruiser"
+  },
+  "Rengar": {
+   "archetype": "assassin"
+  },
+  "Riven": {
+   "archetype": "bruiser"
   },
   "Rumble": {
    "damage": "ap"
@@ -149,6 +216,10 @@
   },
   "Seraphine": {
    "healing": true
+  },
+  "Sett": {
+   "cc": "hard",
+   "archetype": "bruiser"
   },
   "Shyvana": {
    "damage": "mixed"
@@ -169,13 +240,17 @@
    "healing": true
   },
   "Swain": {
-   "healing": true
+   "healing": true,
+   "cc": "hard"
   },
   "Sylas": {
    "healing": true
   },
   "Syndra": {
    "cc": "hard"
+  },
+  "Talon": {
+   "archetype": "assassin"
   },
   "Taric": {
    "healing": true,
@@ -193,11 +268,15 @@
   "Tryndamere": {
    "healing": true
   },
+  "Varus": {
+   "cc": "hard"
+  },
   "Veigar": {
    "cc": "hard"
   },
   "Vi": {
-   "cc": "hard"
+   "cc": "hard",
+   "archetype": "bruiser"
   },
   "Vladimir": {
    "healing": true
@@ -218,6 +297,9 @@
   "Zac": {
    "healing": true,
    "cc": "hard"
+  },
+  "Zed": {
+   "archetype": "assassin"
   },
   "Zyra": {
    "cc": "hard"

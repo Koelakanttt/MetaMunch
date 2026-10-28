@@ -5,6 +5,8 @@ import { buildItemPool } from './item-traits'
 export const PERSONAL_QUEUES: readonly number[] = [400, 420, 440]
 /** Below this many games a number is shown with a "low sample" mark. */
 export const LOW_SAMPLE_GAMES = 5
+/** Weight of the account-average prior when smoothing a champion win rate. */
+export const WINRATE_PRIOR_GAMES = 5
 
 export interface MyGame {
   matchId: string
@@ -34,12 +36,20 @@ export interface PersonalStats {
   games: number
   wins: number
   lowSample: boolean
+  /** Win rate shrunk toward the account average; use it on small samples (0..1). */
+  adjustedWinRate: number
   build: BuildEntry[]
   vs: MatchupEntry[]
 }
 
 export function isLowSample(games: number): boolean {
   return games < LOW_SAMPLE_GAMES
+}
+
+/** Win rate shrunk toward `priorWinRate`; small samples move toward the prior, large ones barely. */
+export function smoothWinRate(games: number, wins: number, priorWinRate: number): number {
+  if (games <= 0) return priorWinRate
+  return (wins + WINRATE_PRIOR_GAMES * priorWinRate) / (games + WINRATE_PRIOR_GAMES)
 }
 
 /**

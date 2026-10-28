@@ -1,181 +1,134 @@
 import { useEffect, useState } from 'react'
+import { DEFAULT_REGION, regionInfo, type RegionPlatform } from '@shared/region'
+import type { Role } from '@shared/rules'
+import { DEFAULT_THEME, type ThemeId } from '@shared/theme'
+import { Badge, Button } from './components/ui'
+import { GamePage } from './pages/GamePage'
+import { MatchHistoryPage } from './pages/MatchHistoryPage'
 import { PatchChangesPage } from './pages/PatchChangesPage'
+import { PoolPage } from './pages/PoolPage'
 import { RecommendPage } from './pages/RecommendPage'
+import { SettingsPage } from './pages/SettingsPage'
+import { StatsPage } from './pages/StatsPage'
 
-interface StaticDataStatus {
-  version: string | null
-  champions: number
-  items: number
-  fetchedAt: number | null
-}
+type Tab = 'recommend' | 'game' | 'pool' | 'matches' | 'stats' | 'patch' | 'settings'
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'recommend', label: 'Recommendations' },
+  { id: 'game', label: 'Game' },
+  { id: 'pool', label: 'My pool' },
+  { id: 'matches', label: 'Matches' },
+  { id: 'stats', label: 'Stats' },
+  { id: 'patch', label: 'Patch changes' },
+  { id: 'settings', label: 'Settings' },
+]
 
 export default function App() {
-  const [reply, setReply] = useState('')
-  const [dbInfo, setDbInfo] = useState('loading…')
-  const [staticStatus, setStaticStatus] = useState<StaticDataStatus | null>(null)
-  const [updating, setUpdating] = useState(false)
-  const [updateMessage, setUpdateMessage] = useState('')
-  const [riotId, setRiotId] = useState('')
-  const [account, setAccount] = useState<{ gameName: string; tagLine: string } | null>(null)
-  const [matchCount, setMatchCount] = useState(0)
-  const [syncing, setSyncing] = useState(false)
-  const [matchMessage, setMatchMessage] = useState('')
+  const [tab, setTab] = useState<Tab>('recommend')
   const [refreshKey, setRefreshKey] = useState(0)
+  const [hasKey, setHasKey] = useState<boolean | null>(null)
+  const [region, setRegion] = useState<RegionPlatform>(DEFAULT_REGION)
+  const [theme, setTheme] = useState<ThemeId>(DEFAULT_THEME)
+  const [focus, setFocus] = useState<{ championId: string; role?: Role } | null>(null)
 
-  async function ping(): Promise<void> {
-    const res = await window.api.invoke('app:ping', { message: 'hi' })
-    setReply(res.reply)
-  }
+  useEffect(() => {
+    document.documentElement.dataset['theme'] = theme
+  }, [theme])
 
   useEffect(() => {
     window.api
-      .invoke('db:info', {})
-      .then((info) => {
-        setDbInfo(`schema v${info.schemaVersion} · SQLite ${info.sqliteVersion}`)
-      })
-      .catch(() => {
-        setDbInfo('db error')
-      })
-  }, [])
-
-  useEffect(() => {
-    window.api
-      .invoke('staticData:status', {})
-      .then(setStaticStatus)
-      .catch(() => {
-        setStaticStatus(null)
-      })
-  }, [])
-
-  useEffect(() => {
-    window.api
-      .invoke('matches:status', {})
+      .invoke('settings:get', {})
       .then((status) => {
-        setAccount(status.account)
-        setMatchCount(status.matches)
+        setHasKey(status.hasRiotKey)
+        setRegion(status.region)
+        setTheme(status.theme)
       })
-      .catch(() => {
-        setAccount(null)
-        setMatchCount(0)
-      })
+      .catch(() => setHasKey(true))
   }, [])
 
-  async function updateData(): Promise<void> {
-    setUpdating(true)
-    try {
-      const res = await window.api.invoke('staticData:refresh', {})
-      setUpdateMessage(res.fromCache ? 'up to date' : 'updated')
-      setRefreshKey((value) => value + 1)
-      const status = await window.api.invoke('staticData:status', {})
-      setStaticStatus(status)
-    } catch (error) {
-      setUpdateMessage(`update failed: ${errorMessage(error)}`)
-    } finally {
-      setUpdating(false)
-    }
+  useEffect(() => {
+    return window.api.onStaticDataUpdated(() => setRefreshKey((value) => value + 1))
+  }, [])
+
+  const bump = (): void => setRefreshKey((value) => value + 1)
+
+  const openRecommendations = (championId: string, role?: Role): void => {
+    setFocus({ championId, role })
+    setTab('recommend')
   }
 
-  async function loadMatchStatus(): Promise<void> {
-    const status = await window.api.invoke('matches:status', {})
-    setAccount(status.account)
-    setMatchCount(status.matches)
+  if (hasKey === null) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">
+        loading…
+      </div>
+    )
   }
-
-  async function saveAccount(): Promise<void> {
-    setMatchMessage('')
-    try {
-      const res = await window.api.invoke('account:set', { riotId })
-      setMatchMessage(`account set: ${res.gameName}#${res.tagLine}`)
-      await loadMatchStatus()
-    } catch (error) {
-      setMatchMessage(`failed: ${errorMessage(error)}`)
-    }
-  }
-
-  async function syncMatches(): Promise<void> {
-    setSyncing(true)
-    setMatchMessage('syncing… (can take a few minutes)')
-    try {
-      const res = await window.api.invoke('matches:sync', {})
-      setMatchMessage(`saved ${res.saved}, skipped ${res.skippedExisting}, failed ${res.failed}`)
-      await loadMatchStatus()
-    } catch (error) {
-      setMatchMessage(`failed: ${errorMessage(error)}`)
-    } finally {
-      setSyncing(false)
-    }
-  }
-
-  const statusLine =
-    staticStatus && staticStatus.version
-      ? `patch ${staticStatus.version} · ${staticStatus.champions} champions · ${staticStatus.items} items`
-      : 'no data yet'
-
-  const accountLine = account
-    ? `${account.gameName}#${account.tagLine} · ${matchCount} matches`
-    : 'no account yet'
 
   return (
-    <div className="min-h-screen bg-slate-900 p-8 text-slate-100">
-      <h1 className="text-3xl font-semibold">MetaMunch</h1>
-      <RecommendPage refreshKey={refreshKey} />
-      <PatchChangesPage />
-      <button
-        type="button"
-        className="mt-6 rounded bg-slate-700 px-4 py-2 hover:bg-slate-600"
-        onClick={() => {
-          void ping()
-        }}
-      >
-        Ping
-      </button>
-      <p className="mt-6">{reply}</p>
-      <p className="mt-2">{dbInfo}</p>
-      <div className="mt-6">
-        <p>{statusLine}</p>
-        <button
-          type="button"
-          className="mt-2 rounded bg-slate-700 px-4 py-2 hover:bg-slate-600 disabled:opacity-50"
-          disabled={updating}
-          onClick={() => {
-            void updateData()
-          }}
-        >
-          Update data
-        </button>
-        {updateMessage ? <p className="mt-2">{updateMessage}</p> : null}
-      </div>
-      <div className="mt-6">
-        <input
-          type="text"
-          placeholder="Name#TAG"
-          value={riotId}
-          onChange={(event) => setRiotId(event.target.value)}
-        />
-        <button
-          type="button"
-          onClick={() => {
-            void saveAccount()
-          }}
-        >
-          Set account
-        </button>
-        <p>{accountLine}</p>
-        <button
-          type="button"
-          disabled={syncing}
-          onClick={() => {
-            void syncMatches()
-          }}
-        >
-          Sync matches
-        </button>
-        {matchMessage ? <p>{matchMessage}</p> : null}
-      </div>
+    <div className="mm-app min-h-screen bg-slate-950 text-slate-100">
+      <header className="border-b border-slate-800 bg-slate-900/80">
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-6 py-4">
+          <h1 className="text-xl font-semibold tracking-tight">MetaMunch</h1>
+          <Badge>alpha</Badge>
+          <span className="ml-auto text-xs text-slate-500">
+            League of Legends companion · {regionInfo(region).label}
+          </span>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-5xl px-6 py-6">
+        {!hasKey ? (
+          <SettingsPage
+            setup
+            onKeySaved={() => setHasKey(true)}
+            onDataUpdated={bump}
+            onAccountChanged={bump}
+            onRegionChanged={setRegion}
+            onThemeChanged={setTheme}
+          />
+        ) : (
+          <>
+            <nav className="mb-5 flex flex-wrap gap-2">
+              {TABS.map((entry) => (
+                <Button
+                  key={entry.id}
+                  variant={tab === entry.id ? 'primary' : 'secondary'}
+                  onClick={() => setTab(entry.id)}
+                >
+                  {entry.label}
+                </Button>
+              ))}
+            </nav>
+
+            {tab === 'recommend' ? (
+              <RecommendPage
+                refreshKey={refreshKey}
+                initialChampionId={focus?.championId ?? null}
+                initialRole={focus?.role ?? 'TOP'}
+              />
+            ) : null}
+            {tab === 'game' ? <GamePage /> : null}
+            {tab === 'pool' ? (
+              <PoolPage refreshKey={refreshKey} onSelectChampion={openRecommendations} />
+            ) : null}
+            {tab === 'matches' ? (
+              <MatchHistoryPage refreshKey={refreshKey} onSelectChampion={openRecommendations} />
+            ) : null}
+            {tab === 'stats' ? <StatsPage refreshKey={refreshKey} /> : null}
+            {tab === 'patch' ? <PatchChangesPage /> : null}
+            {tab === 'settings' ? (
+              <SettingsPage
+                onKeySaved={() => setHasKey(true)}
+                onDataUpdated={bump}
+                onAccountChanged={bump}
+                onRegionChanged={setRegion}
+                onThemeChanged={setTheme}
+              />
+            ) : null}
+          </>
+        )}
+      </main>
     </div>
   )
 }

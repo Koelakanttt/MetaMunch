@@ -59,6 +59,45 @@
       "Knight's Vow"
     ]
   },
+  "archetypes": {
+    "bruiser": {
+      "label": "bruisers",
+      "prefer": ["ad", "health", "abilityHaste"],
+      "avoid": ["crit", "mana"]
+    },
+    "tank": {
+      "label": "tanks",
+      "prefer": ["health", "armor", "mr", "abilityHaste"],
+      "avoid": ["crit", "attackSpeed"]
+    },
+    "assassin": {
+      "label": "assassins",
+      "prefer": ["ad", "ap", "armorPen", "magicPen", "abilityHaste"],
+      "avoid": []
+    },
+    "mage": {
+      "label": "mages",
+      "prefer": ["ap", "abilityHaste", "magicPen", "mana"],
+      "avoid": ["attackSpeed", "crit"]
+    },
+    "marksman": {
+      "label": "marksmen",
+      "prefer": ["ad", "attackSpeed", "crit", "onHit", "armorPen"],
+      "avoid": ["mana", "healShieldPower"]
+    },
+    "enchanter": {
+      "label": "enchanters",
+      "prefer": ["healShieldPower", "abilityHaste", "mana", "ap"],
+      "avoid": ["ad", "crit"]
+    }
+  },
+  "groups": [
+    { "id": "antiheal", "trait": "antiheal", "max": 1 },
+    { "id": "armorPen", "trait": "armorPen", "max": 1 },
+    { "id": "magicPen", "trait": "magicPen", "max": 1 },
+    { "id": "tenacity", "trait": "tenacity", "max": 1 }
+  ],
+  "bootsAllowlist": [],
   "rules": [
     {
       "id": "antiheal-many-healers",
@@ -273,8 +312,9 @@
       "reason": "You deal magic damage: magic penetration boots."
     },
     {
-      "id": "boots-haste-default",
+      "id": "boots-attack-speed-marksman",
       "slot": "boots",
+      "archetypes": ["marksman"],
       "when": [
         {
           "metric": "enemies",
@@ -282,10 +322,10 @@
         }
       ],
       "anyOf": [
-        "abilityHaste"
+        "attackSpeed"
       ],
       "weight": 2,
-      "reason": "No special threat in the enemy team: ability haste boots."
+      "reason": "Marksmen scale with attack speed: attack speed boots."
     }
   ],
   "coreByClass": {

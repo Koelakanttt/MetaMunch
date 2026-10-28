@@ -4,6 +4,16 @@ import { TRAITS } from './item-traits'
 export const ROLES = ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM', 'UTILITY'] as const
 export type Role = (typeof ROLES)[number]
 
+export const ARCHETYPES = [
+  'tank',
+  'bruiser',
+  'assassin',
+  'mage',
+  'marksman',
+  'enchanter',
+] as const
+export type Archetype = (typeof ARCHETYPES)[number]
+
 export const METRICS = [
   'enemies',
   'apShare',
@@ -28,6 +38,7 @@ export const NAME_PLACEHOLDERS = [
 ] as const
 
 const TraitSchema = z.enum(TRAITS)
+const ArchetypeSchema = z.enum(ARCHETYPES)
 
 const ConditionSchema = z
   .object({
@@ -60,6 +71,7 @@ const RuleSchema = z
     when: z.array(ConditionSchema).min(1),
     myDamage: z.enum(['ad', 'ap']).optional(),
     roles: z.array(z.enum(ROLES)).optional(),
+    archetypes: z.array(ArchetypeSchema).optional(),
     allOf: z.array(TraitSchema).default([]),
     anyOf: z.array(TraitSchema).default([]),
     weight: z.number().positive(),
@@ -74,11 +86,26 @@ const CoreSchema = z.object({
   reason: z.string().min(1),
 })
 
+const ArchetypeProfileSchema = z.object({
+  label: z.string().min(1),
+  prefer: z.array(TraitSchema),
+  avoid: z.array(TraitSchema),
+})
+
+const GroupSchema = z.object({
+  id: z.string().min(1),
+  trait: TraitSchema,
+  max: z.number().int().positive(),
+})
+
 const RulesFileSchema = z
   .object({
     version: z.literal(1),
     excludeItems: z.array(z.string()).default([]),
     excludeItemsByRole: z.partialRecord(z.enum(ROLES), z.array(z.string())).default({}),
+    archetypes: z.partialRecord(ArchetypeSchema, ArchetypeProfileSchema).default({}),
+    groups: z.array(GroupSchema).default([]),
+    bootsAllowlist: z.array(z.string()).default([]),
     rules: z.array(RuleSchema),
     coreByClass: z.record(z.string(), CoreSchema).default({}),
   })
@@ -89,6 +116,8 @@ const RulesFileSchema = z
 export type Condition = z.infer<typeof ConditionSchema>
 export type Rule = z.infer<typeof RuleSchema>
 export type CoreSpec = z.infer<typeof CoreSchema>
+export type ArchetypeProfile = z.infer<typeof ArchetypeProfileSchema>
+export type ItemGroup = z.infer<typeof GroupSchema>
 export type Rules = z.infer<typeof RulesFileSchema>
 
 const ChampionTagSchema = z.object({
@@ -96,6 +125,7 @@ const ChampionTagSchema = z.object({
   healing: z.boolean().optional(), // strong self or ally healing/sustain
   tank: z.boolean().optional(), // overrides the automatic tank detection (true or false)
   cc: z.literal('hard').optional(), // reliable stun / knock-up / suppress / root / long CC
+  archetype: ArchetypeSchema.optional(),
 })
 
 const ChampionTagsFileSchema = z.object({

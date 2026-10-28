@@ -1,1 +1,192 @@
 @import "tailwindcss";
+
+/*
+ * Theme tokens. Add a new theme by copying a [data-theme='...'] block in index.css.
+ * The palette remap below keeps the existing Tailwind classes theme-aware.
+ */
+:root,
+[data-theme='pixel'] {
+  --mm-page: #070907;
+  --mm-header: #0b0f0b;
+  --mm-surface: #111511;
+  --mm-surface-2: #151b15;
+  --mm-badge: #1d241d;
+  --mm-border: #39443a;
+  --mm-text: #e9eee7;
+  --mm-muted: #8d998c;
+  --mm-accent: #b8ff5a;
+  --mm-accent-hover: #ccff85;
+  --mm-accent-ink: #081006;
+  --mm-success: #86ff9f;
+  --mm-danger: #ff7a7a;
+  --mm-warning: #ffd166;
+  --mm-secondary: #232b23;
+  --mm-secondary-hover: #2e382e;
+  --mm-hover: #1a211a;
+  --mm-radius: 0px;
+  --mm-radius-pill: 0px;
+  --mm-border-width: 2px;
+  --mm-shadow: 5px 5px 0 rgba(184, 255, 90, 0.14);
+  --mm-font: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+  --mm-grid: rgba(184, 255, 90, 0.05);
+}
+
+[data-theme='slate'] {
+  --mm-page: #020617;
+  --mm-header: #0f172a;
+  --mm-surface: #0f172a;
+  --mm-surface-2: #020617;
+  --mm-badge: #1e293b;
+  --mm-border: #1e293b;
+  --mm-text: #f1f5f9;
+  --mm-muted: #94a3b8;
+  --mm-accent: #4f46e5;
+  --mm-accent-hover: #6366f1;
+  --mm-accent-ink: #ffffff;
+  --mm-success: #34d399;
+  --mm-danger: #fb7185;
+  --mm-warning: #fbbf24;
+  --mm-secondary: #334155;
+  --mm-secondary-hover: #475569;
+  --mm-hover: #1e293b;
+  --mm-radius: 0.5rem;
+  --mm-radius-pill: 9999px;
+  --mm-border-width: 1px;
+  --mm-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  --mm-font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mm-grid: transparent;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  background-color: var(--mm-page);
+  color: var(--mm-text);
+  font-family: var(--mm-font);
+}
+
+.mm-app,
+[data-theme] .mm-app {
+  background-color: transparent;
+}
+
+[data-theme='pixel'] body {
+  background-image:
+    linear-gradient(var(--mm-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--mm-grid) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+[data-theme='pixel'] body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.02) 0 1px,
+    transparent 1px 3px
+  );
+}
+
+/* Palette remap: every existing Tailwind color class follows the active theme. */
+.bg-slate-950 {
+  background-color: var(--mm-page);
+}
+.bg-slate-950\/60 {
+  background-color: var(--mm-surface-2);
+}
+.bg-slate-900\/70 {
+  background-color: var(--mm-surface);
+}
+.bg-slate-900\/80 {
+  background-color: var(--mm-header);
+}
+.bg-slate-800 {
+  background-color: var(--mm-badge);
+}
+.bg-slate-700 {
+  background-color: var(--mm-secondary);
+}
+.bg-indigo-600 {
+  background-color: var(--mm-accent);
+}
+.hover\:bg-indigo-500:hover {
+  background-color: var(--mm-accent-hover);
+}
+.hover\:bg-slate-600:hover {
+  background-color: var(--mm-secondary-hover);
+}
+.hover\:bg-slate-800:hover {
+  background-color: var(--mm-hover);
+}
+.text-slate-100,
+.text-slate-200,
+.text-slate-300 {
+  color: var(--mm-text);
+}
+.text-slate-400,
+.text-slate-500 {
+  color: var(--mm-muted);
+}
+.text-white {
+  color: var(--mm-accent-ink);
+}
+.text-indigo-400 {
+  color: var(--mm-accent);
+}
+.text-emerald-400 {
+  color: var(--mm-success);
+}
+.text-rose-400 {
+  color: var(--mm-danger);
+}
+.text-amber-400 {
+  color: var(--mm-warning);
+}
+.border-slate-800,
+.border-slate-800\/60,
+.border-slate-700 {
+  border-color: var(--mm-border);
+}
+.placeholder\:text-slate-500::placeholder {
+  color: var(--mm-muted);
+}
+.focus\:border-indigo-500:focus {
+  border-color: var(--mm-accent);
+}
+.rounded-xl,
+.rounded-lg,
+.rounded-md {
+  border-radius: var(--mm-radius);
+}
+.rounded-full {
+  border-radius: var(--mm-radius-pill);
+}
+.shadow-lg {
+  box-shadow: var(--mm-shadow);
+}
+.border {
+  border-width: var(--mm-border-width);
+}
+.border-b {
+  border-bottom-width: var(--mm-border-width);
+}
+
+[data-theme='pixel'] h1,
+[data-theme='pixel'] h2,
+[data-theme='pixel'] h3,
+[data-theme='pixel'] button,
+[data-theme='pixel'] th {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+[data-theme='pixel'] header {
+  border-bottom: var(--mm-border-width) solid var(--mm-accent);
+}

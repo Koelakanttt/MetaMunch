@@ -53,6 +53,20 @@ describe.skipIf(!process.env['LIVE'])('item inspection (live)', () => {
     const unknownByLabel = new Map<string, string[]>()
     for (const i of sr) for (const l of unknownStatLabels(i.description)) unknownByLabel.set(l, [...(unknownByLabel.get(l) ?? []), i.name])
     const unknownItems = [...unknownByLabel.entries()].map(([l, n]) => `${l}: ${[...new Set(n)].slice(0, 6).join(', ')}`)
+
+    const nameById = new Map(items.map((i) => [i.id, i.name]))
+    const itemNames = (ids: number[]) => ids.map((id) => nameById.get(id) ?? `id:${id}`).join(', ') || '-'
+    const poolBootIds = new Set(pool.boots.map((i) => i.id))
+    const bootsAndBootsLike = [
+      ...pool.boots,
+      ...items.filter((i) => i.tags.includes('Boots') && !poolBootIds.has(i.id)),
+    ].sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id)
+    const bootsRows = bootsAndBootsLike.map(
+      (i) =>
+        `${i.name} | ${i.id} | ${i.goldTotal} | ${itemNames(i.from)} | ${itemNames(i.into)} | ${i.inStore} | ${
+          Object.keys(i.maps).filter((m) => i.maps[m]).join(',') || '-'
+        }`,
+    )
     const out: string[] = [
       `Data Dragon ${version}: ${items.length} items, ${champions.length} champions`,
       `Pool: ${pool.items.length} items, ${pool.boots.length} boots (shop items on Summoner's Rift: ${sr.length})`,
@@ -62,6 +76,9 @@ describe.skipIf(!process.env['LIVE'])('item inspection (live)', () => {
       '',
       '== POOL BOOTS ==',
       ...pool.boots.map(line).sort(),
+      '',
+      '== BOOTS AND BOOTS-LIKE ITEMS (name | id | gold | from | into | inStore | maps) ==',
+      ...bootsRows,
       '',
       '== TRAIT COUNTS IN POOL ==',
       ...histogram(pool.items.flatMap((i) => itemTraits(i))),

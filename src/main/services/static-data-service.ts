@@ -14,6 +14,7 @@ export class StaticDataService {
   private readonly db: DatabaseSync
   private readonly provider: DataDragonProvider
   private readonly now: () => number
+  private inFlight: Promise<RefreshResult> | null = null
 
   constructor(deps: { db: DatabaseSync; provider: DataDragonProvider; now?: () => number }) {
     this.db = deps.db
@@ -25,7 +26,17 @@ export class StaticDataService {
     return getLatestPatch(this.db)
   }
 
-  async refresh(): Promise<RefreshResult> {
+  /** Concurrent callers (startup check and the Update button) share one refresh. */
+  refresh(): Promise<RefreshResult> {
+    if (this.inFlight) return this.inFlight
+    const run = this.doRefresh().finally(() => {
+      if (this.inFlight === run) this.inFlight = null
+    })
+    this.inFlight = run
+    return run
+  }
+
+  private async doRefresh(): Promise<RefreshResult> {
     const version = await this.provider.getLatestVersion()
 
     if (hasPatch(this.db, version)) {

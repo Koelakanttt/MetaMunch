@@ -41,24 +41,27 @@ export class MatchSyncService {
   private readonly db: DatabaseSync
   private readonly provider: RiotApiProvider
   private readonly platform: string
+  private readonly getPlatform: () => string
   private readonly now: () => number
 
   constructor(deps: {
     db: DatabaseSync
     provider: RiotApiProvider
     platform?: string
+    getPlatform?: () => string
     now?: () => number
   }) {
     this.db = deps.db
     this.provider = deps.provider
     this.platform = deps.platform ?? 'EUW1'
+    this.getPlatform = deps.getPlatform ?? (() => this.platform)
     this.now = deps.now ?? Date.now
   }
 
   async setAccount(riotId: string): Promise<RiotAccount> {
     const parsed = parseRiotId(riotId)
     const account = await this.provider.getAccountByRiotId(parsed.gameName, parsed.tagLine)
-    upsertAccount(this.db, account, this.platform, this.now())
+    upsertAccount(this.db, account, this.getPlatform(), this.now())
     return account
   }
 

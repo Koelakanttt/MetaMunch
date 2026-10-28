@@ -62,13 +62,16 @@ describe('RecommendationService.run', () => {
     expect(JSON.parse(JSON.stringify(r))).toEqual(r)
     expect(r.version).toBe('16.21.1')
     expect(r.level).toBe('rules')
-    expect(r.me).toEqual({ id: 'Garen', name: 'Garen', damage: 'ad' })
+    expect(r.me).toEqual({ id: 'Garen', name: 'Garen', damage: 'ad', archetype: 'tank' })
     expect(r.profile.names.healers).toEqual(['Soraka', 'Vladimir'])
     expect(r.profile.metrics.enemies).toBe(5)
-    expect(r.items.map((i) => i.name).slice(0, 2).sort()).toEqual(['Mortal Reminder', 'Thornmail'])
+    expect(r.items.map((i) => i.name)).toEqual(['Thornmail', 'Force of Nature'])
     expect(r.items[0]?.reasons[0]).toContain('Soraka, Vladimir')
+    expect(r.items[0]?.reasons[1]).toBe('Fits tanks: armor.')
     expect(r.items[0]?.source).toBe('rules')
-    expect(r.boots.map((b) => b.name)).toContain('Chainlaced Crushers')
+    expect(r.core.map((i) => i.name)).toEqual(['Black Cleaver'])
+    expect(r.core[0]?.source).toBe('core')
+    expect(r.boots.map((b) => b.name)).toEqual(['Chainlaced Crushers'])
   })
   it('uses display data of the right champion for ids that differ from names', () => {
     const r = service().run({ meId: 'MonkeyKing', role: 'TOP', enemyIds: [] })
@@ -91,9 +94,29 @@ describe('RecommendationService.run', () => {
   it('has no personal section without a provider and passes the provider result through', () => {
     expect(service().run(request).personal).toBeNull()
     const fake: PersonalStatsProvider = {
-      forChampion: (me, enemies) => ({ account: 'x#1', games: me.id === 'Garen' ? enemies.length : 0, wins: 0, lowSample: true, build: [], vs: [] }),
+      forChampion: (me, enemies) => ({ account: 'x#1', games: me.id === 'Garen' ? enemies.length : 0, wins: 0, lowSample: true, adjustedWinRate: 0.5, build: [], vs: [] }),
     }
     expect(service('16.21.1', fake).run(request).personal?.games).toBe(5)
+  })
+  it('uses the personal build as core when there are enough games', () => {
+    const fake: PersonalStatsProvider = {
+      forChampion: () => ({
+        account: 'x#1',
+        games: 5,
+        wins: 3,
+        lowSample: false,
+        adjustedWinRate: 0.6,
+        build: [{ itemId: 4, name: 'Black Cleaver', games: 4 }],
+        vs: [],
+      }),
+    }
+
+    const r = service('16.21.1', fake).run({ meId: 'Garen', role: 'TOP', enemyIds: [] })
+
+    expect(r.core).toHaveLength(1)
+    expect(r.core[0]?.source).toBe('personal')
+    expect(r.core[0]?.reasons).toEqual(['In your usual build (4 of 5 games).'])
+    expect(r.level).toBe('core')
   })
   it('asks to update the data when nothing is stored', () => {
     expect(() => service(null).run(request)).toThrow('Update data')

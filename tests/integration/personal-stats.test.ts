@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Champion } from '../../src/shared/ddragon'
-import { listMyGames, matchupRecord } from '../../src/main/db/personal-stats-repo'
+import { listMyGames, matchupRecord, accountRecord } from '../../src/main/db/personal-stats-repo'
 import { PersonalStatsService } from '../../src/main/services/personal-stats-service'
 import { insertMatch, memoryDb } from '../helpers/db'
 import { mkItem } from '../helpers/items'
@@ -52,6 +52,10 @@ describe('personal stats repo', () => {
   it('respects a custom queue list', () => {
     expect(listMyGames(db, ME, GAREN, [450]).map((g) => g.matchId)).toEqual(['EUW1_3'])
   })
+  it('counts the overall account record without remakes, ARAM or enemy appearances', () => {
+    expect(accountRecord(db, ME)).toEqual({ games: 4, wins: 3 })
+    expect(accountRecord(db, 'someone-else')).toEqual({ games: 0, wins: 0 })
+  })
 })
 
 describe('PersonalStatsService', () => {
@@ -66,6 +70,7 @@ describe('PersonalStatsService', () => {
     expect(stats?.games).toBe(2)
     expect(stats?.wins).toBe(1)
     expect(stats?.lowSample).toBe(true)
+    expect(stats?.adjustedWinRate).toBeCloseTo((1 + 5 * 0.75) / 7)
     expect(stats?.build).toEqual([
       { itemId: 3075, name: 'Thornmail', games: 2 },
       { itemId: 3071, name: 'Black Cleaver', games: 1 },
@@ -79,6 +84,7 @@ describe('PersonalStatsService', () => {
   it('returns zeros for a champion never played', () => {
     const stats = service.forChampion(champ('Yasuo', 157), [], items)
     expect(stats?.games).toBe(0)
+    expect(stats?.adjustedWinRate).toBeCloseTo(0.75)
     expect(stats?.build).toEqual([])
   })
   it('returns null without a tracked account', () => {

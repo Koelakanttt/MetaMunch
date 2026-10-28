@@ -7,7 +7,7 @@
 
 ## REC-001 — Systemic Recommendation Quality & Champion Context (Generalized)
 
-**Status:** `OBSERVED`  
+**Status:** `RESOLVED`  
 **Category:** Recommendation Engine / Champion Priors / Logic Constraints / Explanations  
 **Priority:** High (Blocks M4)  
 **Detected during:** M3b (Initial observation using Aatrox vs. Akali, Azir, Bard, Aphelios, Briar)
@@ -81,4 +81,4 @@ When rewriting the recommendation logic, the agent must follow this pipeline for
 ### When to Revisit
 Do not patch individual champion cases. Revisit this when implementing the systemic overhaul of the recommendation engine. The agent must ensure that the new logic successfully applies to Aatrox **and** produces valid recommendations for at least two other distinct archetypes (e.g., a Mage and an ADC) against the same enemy composition to prove the logic is truly generalized.
 
-**History:** Initial owner observations following M3b testing. Updated to reflect systemic requirements over champion-specific patches.
+**History:** Initial owner observations following M3b testing. Updated to reflect systemic requirements over champion-specific patches. M3d: engine v2 implemented (archetype profiles, personal/class core split, exclusive item groups, fit-based explanations, boot allowlist); closed after owner checks.

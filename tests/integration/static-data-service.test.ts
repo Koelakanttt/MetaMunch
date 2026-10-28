@@ -80,4 +80,38 @@ describe('StaticDataService', () => {
     await expect(service.refresh()).rejects.toThrow('boom')
     expect(service.status()).toBeNull()
   })
+
+  it('shares one in-flight refresh and then starts a new one', async () => {
+    const calls = { version: 0, champions: 0, items: 0 }
+    const provider: DataDragonProvider = {
+      getLatestVersion: async () => {
+        calls.version += 1
+        return '16.3.1'
+      },
+      getChampions: async () => {
+        calls.champions += 1
+        return { values: champions, skipped: [] }
+      },
+      getItems: async () => {
+        calls.items += 1
+        return { values: items, skipped: [] }
+      },
+      getVersions: async () => [],
+      getChampionDetail: async () => {
+        throw new Error('not used')
+      },
+    }
+    const service = new StaticDataService({ db: migratedDb(), provider, now: () => 1 })
+
+    const first = service.refresh()
+    const second = service.refresh()
+
+    expect(second).toBe(first)
+    expect(await first).toEqual(await second)
+    expect(calls).toEqual({ version: 1, champions: 1, items: 1 })
+
+    const third = await service.refresh()
+    expect(third.fromCache).toBe(true)
+    expect(calls.version).toBe(2)
+  })
 })

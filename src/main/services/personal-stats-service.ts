@@ -1,7 +1,12 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { Champion, Item } from '@shared/ddragon'
-import { isLowSample, summarizeBuild, type PersonalStats } from '@shared/personal'
-import { listMyGames, matchupRecord } from '../db/personal-stats-repo'
+import {
+  isLowSample,
+  smoothWinRate,
+  summarizeBuild,
+  type PersonalStats,
+} from '@shared/personal'
+import { accountRecord, listMyGames, matchupRecord } from '../db/personal-stats-repo'
 
 export interface TrackedAccount {
   puuid: string
@@ -23,11 +28,15 @@ export class PersonalStatsService {
     if (!account) return null
     const games = listMyGames(this.deps.db, account.puuid, me.key)
     const wins = games.filter((g) => g.win).length
+    const overall = accountRecord(this.deps.db, account.puuid)
+    const prior = overall.games > 0 ? overall.wins / overall.games : 0.5
+    const adjustedWinRate = smoothWinRate(games.length, wins, prior)
     return {
       account: `${account.gameName}#${account.tagLine}`,
       games: games.length,
       wins,
       lowSample: isLowSample(games.length),
+      adjustedWinRate,
       build: summarizeBuild(games, items),
       vs: enemies.map((enemy) => {
         const record = matchupRecord(this.deps.db, account.puuid, me.key, enemy.key)

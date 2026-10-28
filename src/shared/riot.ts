@@ -9,6 +9,11 @@ export interface RiotAccount extends RiotId {
   puuid: string
 }
 
+export interface MatchPerkStyle {
+  style: number
+  selections: number[]
+}
+
 export interface MatchParticipant {
   puuid: string
   teamId: number // 100 or 200
@@ -22,6 +27,8 @@ export interface MatchParticipant {
   keystone: number | null
   primaryStyle: number | null
   subStyle: number | null
+  /** Full rune selections (keystone included), null on older matches. */
+  perks: MatchPerkStyle[] | null
 }
 
 export interface Match {
@@ -127,6 +134,11 @@ export function parseMatch(json: unknown): Match {
       keystone: primary?.selections[0]?.perk ?? null,
       primaryStyle: primary?.style ?? null,
       subStyle: sub?.style ?? null,
+      perks:
+        p.perks?.styles.map((style) => ({
+          style: style.style,
+          selections: style.selections.map((selection) => selection.perk),
+        })) ?? null,
     }
   })
   return {

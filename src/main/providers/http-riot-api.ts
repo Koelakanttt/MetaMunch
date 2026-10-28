@@ -17,7 +17,7 @@ export interface HttpRiotApiOptions {
 
 const INVALID_KEY_MESSAGE =
   'Riot API key is invalid or expired (development keys expire every 24 hours). ' +
-  'Update RIOT_API_KEY in .env and restart the app.'
+  'Update it in Settings and try again.'
 
 export class HttpRiotApiProvider implements RiotApiProvider {
   private readonly apiKey: string

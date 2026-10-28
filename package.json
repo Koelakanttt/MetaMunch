@@ -1,7 +1,7 @@
 {
   "name": "metamunch",
-  "version": "1.0.0",
-  "description": "Рабочее название. Десктопное приложение для League of Legends: статистика, личная аналитика, рекомендации предметов по составу врагов, изменения патча для твоего пула чемпионов. Проект для себя. Не влияет на игру и не показывает скрытую информацию.",
+  "version": "0.1.0-alpha",
+  "description": "Desktop League of Legends companion: item recommendations, personal match statistics and patch changes from public Data Dragon and Riot API data.",
   "main": "./out/main/index.js",
   "engines": {
     "node": ">=22"
@@ -9,6 +9,8 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "dist": "npm run build && electron-builder --win nsis",
+    "pack": "npm run build && electron-builder --dir",
     "lint": "eslint .",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
@@ -24,8 +26,8 @@
     "url": "git+https://github.com/Koelakanttt/MetaMunch.git"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "MetaMunch contributors",
+  "license": "MIT",
   "type": "commonjs",
   "bugs": {
     "url": "https://github.com/Koelakanttt/MetaMunch/issues"
@@ -45,6 +47,7 @@
     "@vitejs/plugin-react": "6.1.2",
     "cross-env": "10.1.0",
     "electron": "45.0.0",
+    "electron-builder": "26.18.0",
     "electron-vite": "6.0.0",
     "eslint": "9.39.5",
     "eslint-plugin-react-hooks": "7.1.1",

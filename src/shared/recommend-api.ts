@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { PersonalStats } from './personal'
-import type { Damage, EnemyProfile } from './recommend'
+import type { Archetype, Damage, EnemyProfile } from './recommend'
 import { ROLES, type Metric } from './rules'
 
 export const RecommendRequestSchema = z.object({
@@ -24,17 +24,21 @@ export interface ChampionListResponse {
 export interface RecommendationView {
   itemId: number
   name: string
-  source: 'rules' | 'core'
+  source: 'rules' | 'core' | 'personal'
   reasons: string[]
   ruleIds: string[]
   score: number
+  gold: number
+  plaintext: string
+  stats: Record<string, number>
 }
 
 export interface RecommendResponse {
   version: string
   level: 'rules' | 'core'
-  me: { id: string; name: string; damage: Damage }
+  me: { id: string; name: string; damage: Damage; archetype: Archetype }
   profile: { metrics: Record<Metric, number>; names: EnemyProfile['names'] }
+  core: RecommendationView[]
   items: RecommendationView[]
   boots: RecommendationView[]
   personal: PersonalStats | null // null when no account is tracked

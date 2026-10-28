@@ -11,3 +11,26 @@
 - M3b lint fix (RecommendPage effect)
 - M3c files written, awaiting owner checks
 - M4 files written, awaiting owner checks
+- M3d files written, awaiting owner checks
+- 2026-10-28 alpha code written (secure key/settings, startup patch check, styled 3-screen UI, packaging config, MIT/LICENSE/README) — awaiting owner install/checks/release
+- 2026-10-28 region selection added (platform → Riot cluster, region stored in settings, header + settings UI) — awaiting owner checks
+- 2026-10-28 refresh concurrency guard + region mapping tests — awaiting owner checks
+- 2026-10-28 small-sample win rate smoothing (account-average prior) + UI marker — awaiting owner checks
+- 2026-10-28 My pool screen (per-champion totals, overall record, smoothing) + IPC/tests — awaiting owner checks
+- 2026-10-28 My pool UI polish (overall low-sample label) — awaiting owner checks
+- 2026-10-28 Match history screen (filters by champion/role/patch, item names) + IPC/tests — awaiting owner checks
+- 2026-10-29 pool/history → recommendations click-through, queue filter — awaiting owner checks
+- 2026-10-29 own-sample general stats (champions/items, queue/patch filters) + IPC/tests — awaiting owner checks
+- 2026-10-29 read-only champion-select detection (LCU lockfile/client, settings path, apply detected picks) + tests — awaiting owner checks
+- 2026-10-29 stats-source layer (own/external coordinator, per-patch cache, Settings flag with fallback) + tests — awaiting owner checks
+- 2026-10-29 Stage 5: live-game tips (Live Client Data) + post-game review (missed items, champion patch changes) + tests — awaiting owner checks
+- 2026-10-29 Stage 6 base: theme system (Pixel Green default + Slate, Settings switch), single-instance lock, uncaught error dialog — awaiting owner checks
+- 2026-10-29 Theme palette remap + app shell polish (grid background, square frames, monospace, scanlines) — awaiting owner checks
+- 2026-10-29 Stage 6 release polish (app version in diagnostics, release artifacts latest.yml/blockmap, release checklist) — awaiting owner checks
+- 2026-10-29 Visual pass: Data Dragon champion/item icons via mm-asset protocol, icons in lists/builds/live/patch screens — awaiting owner checks
+- 2026-10-29 Matchup insight (strong/weak same-role sample) + popular rune pages with Data Dragon rune icons — awaiting owner checks
+- 2026-10-29 Lane-first picker: icon dropdown, clear button, lane swap/promote slots — awaiting owner checks
+- 2026-10-29 Item price/plaintext tooltips + teammate synergies (best/worst duos) — awaiting owner checks
+- 2026-10-29 Lane layout fix + lane record; full rune selections stored (schema v6) and shown — awaiting owner checks
+- 2026-10-29 External stats research: no permitted free global provider verified; local fallback retained, no provider integration
+- 2026-10-29 Riot policy prep: visible legal disclaimer in Settings, removed development-key guidance for public use — awaiting owner checks

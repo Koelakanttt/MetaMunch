@@ -73,6 +73,7 @@ describe('parseMatch', () => {
     expect(me?.keystone).toBe(8112)
     expect(me?.primaryStyle).toBe(8100)
     expect(me?.subStyle).toBe(8200)
+    expect(me?.perks).toHaveLength(2)
     expect(me?.summoner1).toBe(4)
   })
   it('tolerates missing perks and empty position', () => {
@@ -81,6 +82,7 @@ describe('parseMatch', () => {
     expect(last?.keystone).toBeNull()
     expect(last?.primaryStyle).toBeNull()
     expect(last?.subStyle).toBeNull()
+    expect(last?.perks).toBeNull()
   })
   it('flags remakes by duration and by the early surrender flag', () => {
     const base = fixture('match.json') as { info: { gameDuration: number; participants: Array<Record<string, unknown>> } }
