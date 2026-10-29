@@ -45,6 +45,9 @@ uses only public data (Data Dragon and the Riot API).
   only; sync new matches to fill the full page. Names and icons come from Data Dragon.
 - **Synergies.** Best with / worst with teammates for the selected champion from the stored sample,
   by same-team records (at least 3 games per duo), with champion icons and win rates.
+- **Purchase order (own sample).** Average first-purchase time per item from stored match
+  timelines. Timelines are fetched when new matches are synced; existing matches can be backfilled
+  in Settings with **Fetch timelines** (ten at a time).
 - **Item tips.** Recommended items show their gold cost and Data Dragon plaintext, and the icon
   tooltip repeats the price and stats summary.
 - **Icons and builds.** Champion and item art from Data Dragon is loaded through a local,
@@ -61,8 +64,9 @@ uses only public data (Data Dragon and the Riot API).
 - **Patch changes.** Compare the previous patch with the latest stored one for your most played
   champions and the items in your usual builds: base stats, ability numbers, item stats and cost.
   Missing data is reported as a note instead of being hidden.
-- **No manual setup.** On first launch the app asks for a Riot API key, stores it encrypted with
-  the operating system keystore and reuses it. Data Dragon is checked automatically on every launch.
+- **No manual setup.** Data Dragon is checked automatically on every launch. A Riot API key is
+  optional for static recommendations and only needed to sync personal matches; when provided, it
+  is stored encrypted with the operating system keystore.
 
 ## Screenshots
 
@@ -81,9 +85,10 @@ uses only public data (Data Dragon and the Riot API).
 
 1. Download the `MetaMunch-0.1.0-alpha-x64.exe` installer from the GitHub Releases page and run it.
    Windows SmartScreen may warn about an unsigned alpha build.
-2. Start MetaMunch. The first screen asks for a Riot API key. Use a key you are authorized to use;
-   development keys are for local prototyping only, expire every 24 hours and must not be shared.
-   See the [Riot developer portal](https://developer.riotgames.com/) for the current policies.
+2. Start MetaMunch. The first screen offers to add a Riot API key for personal match sync, or
+   **Continue without a Riot API key** for static recommendations. Development keys are for local
+   prototyping only, expire every 24 hours and must not be shared. See the
+   [Riot developer portal](https://developer.riotgames.com/) for the current policies.
 3. If you are not on EU West, pick your server in **Settings** first, then enter your Riot ID
    (`Name#TAG`), press **Set account**, then **Sync matches**.
 4. Go back to **Recommendations** and pick your champion, role and enemies.
@@ -122,8 +127,9 @@ Never commit `.env`. Packaged builds use the key saved in the app.
 
 The release workflow (`.github/workflows/release.yml`) builds the Windows installer on every `v*`
 tag and uploads it with `latest.yml` and the blockmap. See
-[docs/release-checklist.md](docs/release-checklist.md) for the full pre-release checklist. The alpha
-installer is unsigned, so Windows SmartScreen may warn; auto-update is not enabled yet.
+[docs/release-checklist.md](docs/release-checklist.md) for the full pre-release checklist. Backend
+plans are recorded in [docs/backend-roadmap.md](docs/backend-roadmap.md). The alpha installer is
+unsigned, so Windows SmartScreen may warn; auto-update is not enabled yet.
 
 ## Data and limitations
 
@@ -131,9 +137,9 @@ installer is unsigned, so Windows SmartScreen may warn; auto-update is not enabl
   lookups and match syncs; Data Dragon static data is global. After switching servers, set your
   Riot ID again. Static data comes from Data Dragon; matches come from the official Riot API.
 - Alpha does not include external statistics sites, client integration or in-game overlays.
-  Global/pro-build statistics, rank filters, ban rates and skill-order data need external aggregate
-  sources or match timeline sync, which are not implemented. The “Suggested items” strip is
-  recommendation order, not purchase timing.
+  Global/pro-build statistics, rank filters, ban rates and skill-order analysis need external
+  aggregate sources; they are not implemented. Purchase timing is available only for matches with
+  stored timeline data.
 - Recommendations are heuristic. They use public champion tags and your own match history; check
   them in the client before buying.
 - No telemetry, no analytics, no accounts, no monetization.

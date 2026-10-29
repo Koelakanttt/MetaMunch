@@ -21,6 +21,7 @@ export interface TestParticipant {
   primaryStyle?: number | null
   subStyle?: number | null
   perks?: { style: number; selections: number[] }[] | null
+  participantId?: number
 }
 
 export interface TestMatch {
@@ -38,7 +39,7 @@ export function insertMatch(db: DatabaseSync, match: TestMatch): void {
   ).run(match.id, 'EUW1', match.queue, '16.21', '16.21.600.1', match.creation, 1800, match.remake ? 1 : 0)
   match.participants.forEach((p, slot) => {
     db.prepare(
-      'INSERT INTO participants (match_id, slot, puuid, team_id, champion_id, position, win, items, trinket, summoner1, summoner2, keystone, primary_style, sub_style, perks) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      'INSERT INTO participants (match_id, slot, puuid, team_id, champion_id, position, win, items, trinket, summoner1, summoner2, keystone, primary_style, sub_style, perks, participant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     ).run(
       match.id,
       slot,
@@ -55,6 +56,7 @@ export function insertMatch(db: DatabaseSync, match: TestMatch): void {
       p.primaryStyle ?? null,
       p.subStyle ?? null,
       p.perks ? JSON.stringify(p.perks) : null,
+      p.participantId ?? slot + 1,
     )
   })
 }

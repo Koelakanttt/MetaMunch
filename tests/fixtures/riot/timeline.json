@@ -1,0 +1,35 @@
+{
+  "info": {
+    "frames": [
+      {
+        "events": [
+          {
+            "timestamp": 1000,
+            "type": "ITEM_PURCHASED",
+            "participantId": 3,
+            "itemId": 1054
+          },
+          {
+            "timestamp": 2500,
+            "type": "ITEM_PURCHASED",
+            "participantId": 3,
+            "itemId": 1001
+          },
+          {
+            "timestamp": 3000,
+            "type": "SKILL_LEVEL_UP",
+            "participantId": 3,
+            "skillSlot": 1,
+            "level": 1
+          },
+          {
+            "timestamp": 4000,
+            "type": "ITEM_PURCHASED",
+            "participantId": 1,
+            "itemId": 3089
+          }
+        ]
+      }
+    ]
+  }
+}

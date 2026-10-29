@@ -1,5 +1,7 @@
 import type { Match, RiotAccount } from '@shared/riot'
 import { parseAccount, parseMatch, parseMatchIds } from '@shared/riot'
+import type { TimelineEvent } from '@shared/timeline'
+import { parseTimeline } from '@shared/timeline'
 import { parseRateLimitHeader, parseRetryAfterMs, RateLimiter } from './rate-limiter'
 import type { MatchIdsQuery, RiotApiProvider } from './riot-api'
 import { RiotApiError } from './riot-api'
@@ -51,6 +53,10 @@ export class HttpRiotApiProvider implements RiotApiProvider {
 
   async getMatch(matchId: string): Promise<Match> {
     return parseMatch(await this.request(`/lol/match/v5/matches/${matchId}`))
+  }
+
+  async getTimeline(matchId: string): Promise<TimelineEvent[]> {
+    return parseTimeline(await this.request(`/lol/match/v5/matches/${matchId}/timeline`))
   }
 
   private async request(path: string): Promise<unknown> {

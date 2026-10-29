@@ -7,6 +7,7 @@ import type { PatchChangesResponse } from './patch-diff'
 import type { PostGameResult } from './post-game'
 import type { RunesResponse } from './runes'
 import type { SynergiesResponse } from './synergies'
+import type { PurchaseOrderResponse, TimelineBackfillResult } from './timeline'
 import type { PoolResponse } from './pool'
 import type { ChampionListResponse, RecommendRequest, RecommendResponse } from './recommend-api'
 import type { RegionPlatform } from './region'
@@ -33,6 +34,8 @@ export interface IpcChannels {
   'pool:list': { req: Record<string, never>; res: PoolResponse }
   'stats:general': { req: GeneralStatsFilters; res: GeneralStatsResponse }
   'champSelect:status': { req: Record<string, never>; res: ChampionSelectStatus }
+  'timeline:purchaseOrder': { req: { championId: string }; res: PurchaseOrderResponse }
+  'matches:backfillTimelines': { req: Record<string, never>; res: TimelineBackfillResult }
   'live:status': { req: Record<string, never>; res: LiveGameStatus }
   'review:last': { req: Record<string, never>; res: PostGameResult }
   'matchups:list': { req: { championId: string }; res: MatchupsResponse }

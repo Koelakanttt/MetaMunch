@@ -32,6 +32,7 @@ function errorMessage(reason: unknown): string {
 
 export function SettingsPage({
   setup = false,
+  onSkip,
   onKeySaved,
   onDataUpdated,
   onAccountChanged,
@@ -39,6 +40,7 @@ export function SettingsPage({
   onThemeChanged,
 }: {
   setup?: boolean
+  onSkip?: () => void
   onKeySaved: () => void
   onDataUpdated: () => void
   onAccountChanged: () => void
@@ -70,6 +72,8 @@ export function SettingsPage({
   const [riotId, setRiotId] = useState('')
   const [accountMessage, setAccountMessage] = useState('')
   const [syncing, setSyncing] = useState(false)
+  const [backfilling, setBackfilling] = useState(false)
+  const [timelineMessage, setTimelineMessage] = useState('')
 
   const [dbInfo, setDbInfo] = useState('')
 
@@ -196,6 +200,22 @@ export function SettingsPage({
 
   async function loadMatchStatus(): Promise<void> {
     setMatchStatus(await window.api.invoke('matches:status', {}))
+  }
+
+  async function backfillTimelines(): Promise<void> {
+    setBackfilling(true)
+    setTimelineMessage('')
+    try {
+      const res = await window.api.invoke('matches:backfillTimelines', {})
+      setTimelineMessage(
+        `timelines: ${res.saved} saved of ${res.requested}${res.failed > 0 ? `, ${res.failed} failed` : ''}`,
+      )
+      onAccountChanged()
+    } catch (error) {
+      setTimelineMessage(`timeline fetch failed: ${errorMessage(error)}`)
+    } finally {
+      setBackfilling(false)
+    }
   }
 
   async function saveAccount(): Promise<void> {
@@ -424,9 +444,8 @@ export function SettingsPage({
             from public Riot data.
           </p>
           <p className="text-slate-400">
-            To start, paste a Riot API key that you are authorized to use. Development keys are for
-            local prototyping only and expire every 24 hours; never share your key. No config editing
-            is needed.
+            You can use static champion recommendations and the local game companion without a Riot
+            API key. Add a key later to sync your own matches and enable personal statistics.
           </p>
         </Card>
         {keyCard}
@@ -435,6 +454,13 @@ export function SettingsPage({
         {statsSourceCard}
         {themeCard}
         {legalCard}
+        {onSkip ? (
+          <div className="flex justify-center">
+            <Button variant="secondary" onClick={onSkip}>
+              Continue without a Riot API key
+            </Button>
+          </div>
+        ) : null}
       </div>
     )
   }
@@ -474,7 +500,7 @@ export function SettingsPage({
             onClick={() => {
               void saveAccount()
             }}
-            disabled={riotId.trim() === ''}
+            disabled={riotId.trim() === '' || !settings?.hasRiotKey}
           >
             Set account
           </Button>
@@ -486,7 +512,17 @@ export function SettingsPage({
           >
             {syncing ? 'syncing…' : 'Sync matches'}
           </Button>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              void backfillTimelines()
+            }}
+            disabled={backfilling || !matchStatus?.account || !settings?.hasRiotKey}
+          >
+            {backfilling ? 'fetching timelines…' : 'Fetch timelines'}
+          </Button>
         </div>
+        {timelineMessage ? <StatusLine tone="muted">{timelineMessage}</StatusLine> : null}
         {accountMessage ? (
           <StatusLine tone={accountMessage.startsWith('failed') ? 'error' : 'default'}>
             {accountMessage}
@@ -496,6 +532,11 @@ export function SettingsPage({
           Only Summoner&apos;s Rift queues (normal, ranked solo, ranked flex) are counted. ARAM and
           remakes are ignored.
         </StatusLine>
+        {!settings?.hasRiotKey ? (
+          <StatusLine tone="muted">
+            Add a Riot API key above to sync matches and enable personal statistics.
+          </StatusLine>
+        ) : null}
       </Card>
 
       <Card title="Data Dragon">

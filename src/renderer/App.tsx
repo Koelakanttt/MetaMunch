@@ -27,6 +27,13 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('recommend')
   const [refreshKey, setRefreshKey] = useState(0)
   const [hasKey, setHasKey] = useState<boolean | null>(null)
+  const [setupSkipped, setSetupSkipped] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem('metamunch.setupSkipped') === '1'
+    } catch {
+      return false
+    }
+  })
   const [region, setRegion] = useState<RegionPlatform>(DEFAULT_REGION)
   const [theme, setTheme] = useState<ThemeId>(DEFAULT_THEME)
   const [focus, setFocus] = useState<{ championId: string; role?: Role } | null>(null)
@@ -52,6 +59,15 @@ export default function App() {
 
   const bump = (): void => setRefreshKey((value) => value + 1)
 
+  const skipSetup = (): void => {
+    try {
+      window.localStorage.setItem('metamunch.setupSkipped', '1')
+    } catch {
+      // Local storage is optional; the session still works without it.
+    }
+    setSetupSkipped(true)
+  }
+
   const openRecommendations = (championId: string, role?: Role): void => {
     setFocus({ championId, role })
     setTab('recommend')
@@ -71,6 +87,7 @@ export default function App() {
         <div className="mx-auto flex max-w-5xl items-center gap-3 px-6 py-4">
           <h1 className="text-xl font-semibold tracking-tight">MetaMunch</h1>
           <Badge>alpha</Badge>
+          {!hasKey ? <Badge>no key · static mode</Badge> : null}
           <span className="ml-auto text-xs text-slate-500">
             League of Legends companion · {regionInfo(region).label}
           </span>
@@ -78,9 +95,10 @@ export default function App() {
       </header>
 
       <main className="mx-auto max-w-5xl px-6 py-6">
-        {!hasKey ? (
+        {!hasKey && !setupSkipped ? (
           <SettingsPage
             setup
+            onSkip={skipSetup}
             onKeySaved={() => setHasKey(true)}
             onDataUpdated={bump}
             onAccountChanged={bump}

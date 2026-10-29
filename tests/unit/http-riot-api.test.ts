@@ -14,6 +14,8 @@ const ACCOUNT_URL =
 const IDS_URL =
   'https://europe.api.riotgames.com/lol/match/v5/matches/by-puuid/puuid-me-0001/ids?queue=420&start=0&count=5'
 const MATCH_URL = 'https://europe.api.riotgames.com/lol/match/v5/matches/EUW1_7000000001'
+const TIMELINE_URL =
+  'https://europe.api.riotgames.com/lol/match/v5/matches/EUW1_7000000001/timeline'
 
 function fixture(name: string): string {
   return readFileSync(join(process.cwd(), 'tests/fixtures/riot', name), 'utf8')
@@ -40,6 +42,7 @@ function defaultHandler(url: string): Response {
   if (url === ACCOUNT_URL) return new Response(fixture('account.json'))
   if (url === IDS_URL) return new Response(fixture('match-ids.json'))
   if (url === MATCH_URL) return new Response(fixture('match.json'))
+  if (url === TIMELINE_URL) return new Response(fixture('timeline.json'))
   return new Response('missing', { status: 404 })
 }
 
@@ -65,11 +68,16 @@ describe('HttpRiotApiProvider', () => {
     const match = await provider.getMatch('EUW1_7000000001')
     expect(match.participants).toHaveLength(10)
 
+    const timeline = await provider.getTimeline('EUW1_7000000001')
+    expect(timeline).toHaveLength(4)
+    expect(timeline[0]?.type).toBe('ITEM_PURCHASED')
+
     expect(calls[0]?.url).toBe(ACCOUNT_URL)
     expect(calls[0]?.token).toBe(TEST_KEY)
     expect(calls[0]?.userAgent).toBe('MetaMunch (personal project)')
     expect(calls[1]?.url).toBe(IDS_URL)
     expect(calls[2]?.url).toBe(MATCH_URL)
+    expect(calls[3]?.url).toBe(TIMELINE_URL)
   })
 
   it('rejects 401 without leaking the key', async () => {

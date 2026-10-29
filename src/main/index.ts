@@ -28,6 +28,7 @@ import { PatchChangesService } from './services/patch-changes-service'
 import { PersonalStatsService } from './services/personal-stats-service'
 import { PoolService } from './services/pool-service'
 import { PostGameService } from './services/post-game-service'
+import { PurchaseOrderService } from './services/purchase-order-service'
 import { RecommendationService } from './services/recommendation-service'
 import { RuneService } from './services/rune-service'
 import type { SettingsCrypto } from './services/settings-service'
@@ -35,6 +36,7 @@ import { SettingsService } from './services/settings-service'
 import { StatsCoordinator } from './services/stats-coordinator'
 import { StaticDataService } from './services/static-data-service'
 import { SynergyService } from './services/synergy-service'
+import { TimelineBackfillService } from './services/timeline-backfill-service'
 
 loadEnv(app.getAppPath())
 
@@ -200,6 +202,12 @@ void app.whenReady().then(() => {
     source,
     provider: new HttpRuneDataProvider(),
   })
+  const purchaseOrder = new PurchaseOrderService({ db, source, getAccount: getTrackedAccount })
+  const timelineBackfill = new TimelineBackfillService({
+    db,
+    provider: riotProxy,
+    getAccount: getTrackedAccount,
+  })
   const postGame = new PostGameService({
     db,
     getAccount: getTrackedAccount,
@@ -229,6 +237,8 @@ void app.whenReady().then(() => {
       matchups,
       synergies,
       runes,
+      purchaseOrder,
+      timelineBackfill,
       settings,
     }),
   )

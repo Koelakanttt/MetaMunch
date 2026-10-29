@@ -16,6 +16,7 @@ import { MatchupService } from '../../src/main/services/matchup-service'
 import { PatchChangesService } from '../../src/main/services/patch-changes-service'
 import { PoolService } from '../../src/main/services/pool-service'
 import { PostGameService } from '../../src/main/services/post-game-service'
+import { PurchaseOrderService } from '../../src/main/services/purchase-order-service'
 import { RecommendationService } from '../../src/main/services/recommendation-service'
 import { RuneService } from '../../src/main/services/rune-service'
 import type { StaticDataSource } from '../../src/main/services/recommendation-service'
@@ -27,6 +28,7 @@ import {
 import { StatsCoordinator } from '../../src/main/services/stats-coordinator'
 import { StaticDataService } from '../../src/main/services/static-data-service'
 import { SynergyService } from '../../src/main/services/synergy-service'
+import { TimelineBackfillService } from '../../src/main/services/timeline-backfill-service'
 
 const dataDragonProvider: DataDragonProvider = {
   getLatestVersion: async () => '16.3.1',
@@ -97,6 +99,16 @@ const runes = new RuneService({
   source: fakeSource,
   provider: { getRunes: async () => [] },
 })
+const purchaseOrder = new PurchaseOrderService({
+  db,
+  source: fakeSource,
+  getAccount: () => null,
+})
+const timelineBackfill = new TimelineBackfillService({
+  db,
+  provider: riotProvider,
+  getAccount: () => null,
+})
 const handlers = createHandlers({
   db,
   appVersion: '0.1.0-alpha',
@@ -113,6 +125,8 @@ const handlers = createHandlers({
   matchups,
   synergies,
   runes,
+  purchaseOrder,
+  timelineBackfill,
   settings,
 })
 
@@ -127,7 +141,7 @@ describe('ipc handlers', () => {
   it('reports db info', async () => {
     const res = await handlers['db:info']({})
 
-    expect(res.schemaVersion).toBe(6)
+    expect(res.schemaVersion).toBe(7)
     expect(res.sqliteVersion).toMatch(/^3\./)
     expect(res.appVersion).toBe('0.1.0-alpha')
   })
@@ -271,5 +285,18 @@ describe('ipc handlers', () => {
       pages: [],
       hasStaticData: false,
     })
+  })
+
+  it('reports no purchase timeline without static data', async () => {
+    expect(await handlers['timeline:purchaseOrder']({ championId: 'Garen' })).toMatchObject({
+      championId: 'Garen',
+      sampleMatches: 0,
+      items: [],
+      hasTimeline: false,
+    })
+  })
+
+  it('rejects timeline backfill without an account', async () => {
+    await expect(handlers['matches:backfillTimelines']({})).rejects.toThrow('No account set')
   })
 })

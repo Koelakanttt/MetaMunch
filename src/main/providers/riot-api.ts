@@ -1,4 +1,5 @@
 import type { Match, RiotAccount } from '@shared/riot'
+import type { TimelineEvent } from '@shared/timeline'
 
 export interface MatchIdsQuery {
   queue: number // e.g. 420 ranked solo, 440 ranked flex, 400 normal draft
@@ -12,6 +13,8 @@ export interface RiotApiProvider {
   /** Newest first. */
   getMatchIds(puuid: string, query: MatchIdsQuery): Promise<string[]>
   getMatch(matchId: string): Promise<Match>
+  /** Optional so test providers and static-only providers can omit it. */
+  getTimeline?(matchId: string): Promise<TimelineEvent[]>
 }
 
 export class RiotApiError extends Error {

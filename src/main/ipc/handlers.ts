@@ -9,12 +9,14 @@ import type { MatchupService } from '../services/matchup-service'
 import type { PatchChangesService } from '../services/patch-changes-service'
 import type { PoolService } from '../services/pool-service'
 import type { PostGameService } from '../services/post-game-service'
+import type { PurchaseOrderService } from '../services/purchase-order-service'
 import type { RecommendationService } from '../services/recommendation-service'
 import type { RuneService } from '../services/rune-service'
 import type { SettingsService } from '../services/settings-service'
 import type { StatsCoordinator } from '../services/stats-coordinator'
 import type { StaticDataService } from '../services/static-data-service'
 import type { SynergyService } from '../services/synergy-service'
+import type { TimelineBackfillService } from '../services/timeline-backfill-service'
 
 export function createHandlers(deps: {
   db: DatabaseSync
@@ -32,6 +34,8 @@ export function createHandlers(deps: {
   matchups: MatchupService
   synergies: SynergyService
   runes: RuneService
+  purchaseOrder: PurchaseOrderService
+  timelineBackfill: TimelineBackfillService
   settings: SettingsService
 }): IpcHandlers {
   return {
@@ -99,6 +103,8 @@ export function createHandlers(deps: {
     'pool:list': () => deps.pool.list(),
     'stats:general': (filters) => deps.generalStats.run(filters),
     'champSelect:status': () => deps.championSelect.status(),
+    'timeline:purchaseOrder': ({ championId }) => deps.purchaseOrder.forChampion(championId),
+    'matches:backfillTimelines': () => deps.timelineBackfill.run(),
     'live:status': () => deps.liveGame.status(),
     'review:last': () => deps.postGame.review(),
     'matchups:list': ({ championId }) => deps.matchups.forChampion(championId),

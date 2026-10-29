@@ -34,3 +34,6 @@
 - 2026-10-29 Lane layout fix + lane record; full rune selections stored (schema v6) and shown — awaiting owner checks
 - 2026-10-29 External stats research: no permitted free global provider verified; local fallback retained, no provider integration
 - 2026-10-29 Riot policy prep: visible legal disclaimer in Settings, removed development-key guidance for public use — awaiting owner checks
+- 2026-10-29 Static mode: onboarding can be skipped without a Riot key; key required only for personal match sync — awaiting owner checks
+- 2026-10-29 Timeline support: schema v7, match timelines, purchase-order averages, Settings backfill — awaiting owner checks
+- 2026-10-29 Backend recorded in docs/backend-roadmap.md (deferred until local app is complete)

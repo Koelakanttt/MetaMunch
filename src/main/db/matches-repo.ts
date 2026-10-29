@@ -80,8 +80,8 @@ export function saveMatch(db: DatabaseSync, match: Match, trackedPuuids: readonl
     const insertParticipant = db.prepare(
       `INSERT INTO participants
         (match_id, slot, puuid, team_id, champion_id, position, win, items,
-         trinket, summoner1, summoner2, keystone, primary_style, sub_style, perks)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         trinket, summoner1, summoner2, keystone, primary_style, sub_style, perks, participant_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     const tracked = new Set(trackedPuuids)
     match.participants.forEach((participant, slot) => {
@@ -101,6 +101,7 @@ export function saveMatch(db: DatabaseSync, match: Match, trackedPuuids: readonl
         participant.primaryStyle,
         participant.subStyle,
         participant.perks ? JSON.stringify(participant.perks) : null,
+        participant.participantId,
       )
     })
 

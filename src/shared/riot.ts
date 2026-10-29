@@ -15,6 +15,7 @@ export interface MatchPerkStyle {
 }
 
 export interface MatchParticipant {
+  participantId: number // 1..10, matches the timeline participantId
   puuid: string
   teamId: number // 100 or 200
   championId: number // numeric champion key, same as Champion.key
@@ -82,6 +83,7 @@ const PerkStyleRaw = z.object({
 })
 
 const ParticipantRaw = z.object({
+  participantId: z.number().default(0),
   puuid: z.string(),
   teamId: z.number(),
   championId: z.number(),
@@ -118,10 +120,11 @@ export function parseMatch(json: unknown): Match {
   const raw = MatchRaw.parse(json)
   const id = raw.metadata.matchId
   const info = raw.info
-  const participants: MatchParticipant[] = info.participants.map((p) => {
+  const participants: MatchParticipant[] = info.participants.map((p, index) => {
     const primary = p.perks?.styles.find((s) => s.description === 'primaryStyle')
     const sub = p.perks?.styles.find((s) => s.description === 'subStyle')
     return {
+      participantId: p.participantId > 0 ? p.participantId : index + 1,
       puuid: p.puuid,
       teamId: p.teamId,
       championId: p.championId,

@@ -9,6 +9,7 @@ import {
   saveMatch,
   upsertAccount,
 } from '../db/matches-repo'
+import { saveTimelineForMatch } from '../db/timeline-repo'
 import type { RiotApiProvider } from '../providers/riot-api'
 import { RiotApiError } from '../providers/riot-api'
 
@@ -105,6 +106,12 @@ export class MatchSyncService {
       try {
         const match = await this.provider.getMatch(matchId)
         saveMatch(this.db, match, [account.puuid])
+        try {
+          const timeline = await this.provider.getTimeline?.(matchId)
+          if (timeline) saveTimelineForMatch(this.db, match, timeline, [account.puuid])
+        } catch {
+          // The match is still useful without optional timeline data.
+        }
         saved += 1
       } catch (error) {
         if (error instanceof RiotApiError && (error.status === 401 || error.status === 403)) {

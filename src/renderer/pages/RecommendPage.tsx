@@ -9,6 +9,7 @@ import type {
 } from '@shared/recommend-api'
 import type { RunesResponse } from '@shared/runes'
 import type { SynergiesResponse, SynergyEntry } from '@shared/synergies'
+import type { PurchaseOrderResponse } from '@shared/timeline'
 import { ROLES, type Role } from '@shared/rules'
 import { ChampionPicker } from '../components/ChampionPicker'
 import { ChampionIcon, ItemIcon, RuneIcon } from '../components/Icon'
@@ -255,6 +256,49 @@ function SynergyColumn({
   )
 }
 
+function formatSeconds(seconds: number): string {
+  const minutes = Math.floor(seconds / 60)
+  return `${minutes}:${String(seconds % 60).padStart(2, '0')}`
+}
+
+function PurchaseOrderBlock({
+  data,
+  error,
+}: {
+  data: PurchaseOrderResponse | null
+  error: string
+}) {
+  if (error) return <StatusLine tone="error">error: {error}</StatusLine>
+  if (!data) return <StatusLine tone="muted">loading purchase order…</StatusLine>
+  if (!data.hasTimeline) {
+    return (
+      <EmptyState>
+        No timeline data yet. Sync new matches or use &quot;Fetch timelines&quot; in Settings.
+      </EmptyState>
+    )
+  }
+  if (data.items.length === 0) {
+    return <EmptyState>No item purchases recorded in the timeline sample.</EmptyState>
+  }
+  return (
+    <div className="space-y-2">
+      <StatusLine tone="muted">
+        {`${data.sampleMatches} matches with timeline data; times are the first purchase in each game.`}
+      </StatusLine>
+      <ul className="space-y-1">
+        {data.items.map((item) => (
+          <li key={item.itemId} className="flex items-center gap-2 text-xs">
+            <ItemIcon itemId={item.itemId} name={item.name} size={28} />
+            <span className="flex-1 truncate text-slate-300">{item.name}</span>
+            <span className="text-slate-400">~{formatSeconds(item.averageSeconds)}</span>
+            <span className="text-slate-500">{item.games}g</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 function RuneBlock({ data, error }: { data: RunesResponse | null; error: string }) {
   if (error) return <StatusLine tone="error">error: {error}</StatusLine>
   if (!data) return <StatusLine tone="muted">loading runes…</StatusLine>
@@ -430,6 +474,8 @@ export function RecommendPage({
   const [synergyError, setSynergyError] = useState('')
   const [runes, setRunes] = useState<RunesResponse | null>(null)
   const [runeError, setRuneError] = useState('')
+  const [purchaseOrder, setPurchaseOrder] = useState<PurchaseOrderResponse | null>(null)
+  const [purchaseOrderError, setPurchaseOrderError] = useState('')
   const requestIdRef = useRef(0)
   const resultChampionId = result?.me.id ?? null
 
@@ -489,6 +535,30 @@ export function RecommendPage({
       cancelled = true
     }
   }, [resultChampionId])
+
+  useEffect(() => {
+    const championId = resultChampionId
+    if (!championId) return
+    let cancelled = false
+
+    const run = async (): Promise<void> => {
+      setPurchaseOrderError('')
+      try {
+        const response = await window.api.invoke('timeline:purchaseOrder', { championId })
+        if (!cancelled) setPurchaseOrder(response)
+      } catch (reason) {
+        if (!cancelled) {
+          setPurchaseOrder(null)
+          setPurchaseOrderError(invokeErrorMessage(reason))
+        }
+      }
+    }
+
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [resultChampionId, refreshKey])
 
   useEffect(() => {
     const championId = resultChampionId
@@ -792,6 +862,10 @@ export function RecommendPage({
 
           <Card title="Boots">
             <RecommendationList items={result.boots} />
+          </Card>
+
+          <Card title="Purchase order (own sample)">
+            <PurchaseOrderBlock data={purchaseOrder} error={purchaseOrderError} />
           </Card>
 
           <div className="grid gap-4 lg:grid-cols-2">
