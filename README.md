@@ -71,11 +71,11 @@ uses only public data (Data Dragon and the Riot API).
      docs/screenshots/patch-changes.png
      docs/screenshots/settings.png -->
 
-![Recommendations](docs/screenshots/recommendations.png)
+[Recommendations]<img width="1917" height="1028" alt="image" src="https://github.com/user-attachments/assets/313c0dd7-82fb-42d0-82af-da2910336745" />
 
-![Patch changes](docs/screenshots/patch-changes.png)
+<img width="1900" height="1028" alt="image" src="https://github.com/user-attachments/assets/9fa3c5a8-28a3-479f-abe9-8b4be38533a6" />
 
-![Settings](docs/screenshots/settings.png)
+[Settings]<img width="1069" height="617" alt="image" src="https://github.com/user-attachments/assets/d428d116-feac-4c34-8e6f-702c7e9e120c" />
 
 ## Install (alpha)
 
