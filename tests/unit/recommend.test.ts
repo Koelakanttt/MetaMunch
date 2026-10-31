@@ -331,20 +331,20 @@ describe('core list', () => {
     },
   })
 
-  it('uses my build when there are at least three games', () => {
+  it('uses my build when there are at least five games', () => {
     const result = runWith(aatrox, [], coreRules, {
-      prior: { games: 3, build: [{ name: 'Warrior Blade', games: 3 }] },
+      prior: { games: 5, build: [{ name: 'Warrior Blade', games: 5 }] },
     })
 
     expect(result.core).toHaveLength(1)
     expect(result.core[0]?.source).toBe('personal')
-    expect(result.core[0]?.reasons).toEqual(['In your usual build (3 of 3 games).'])
+    expect(result.core[0]?.reasons).toEqual(['In your usual build (5 of 5 games).'])
     expect(result.level).toBe('core')
   })
 
-  it('falls back to the class core below three games', () => {
+  it('falls back to the class core below five games', () => {
     const result = runWith(aatrox, [], coreRules, {
-      prior: { games: 2, build: [{ name: 'Warrior Blade', games: 2 }] },
+      prior: { games: 4, build: [{ name: 'Warrior Blade', games: 4 }] },
     })
 
     expect(result.core[0]?.source).toBe('core')
@@ -369,7 +369,7 @@ describe('core list', () => {
     })
 
     const result = runWith(aatrox, [jinx], adRules, {
-      prior: { games: 3, build: [{ name: 'Warrior Blade', games: 3 }] },
+      prior: { games: 5, build: [{ name: 'Warrior Blade', games: 5 }] },
     })
 
     expect(names(result.core)).toContain('Warrior Blade')

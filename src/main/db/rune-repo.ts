@@ -6,6 +6,7 @@ export interface RunePageRow {
   primaryStyle: number
   subStyle: number
   perks: string | null
+  statPerks?: string | null
   games: number
   wins: number
 }
@@ -41,6 +42,7 @@ export function runePageTotals(
     primaryStyle: Number(row['primary_style']),
     subStyle: Number(row['sub_style']),
     perks: row['perks'] === null || row['perks'] === undefined ? null : String(row['perks']),
+    statPerks: null,
     games: Number(row['games']),
     wins: Number(row['wins']),
   }))

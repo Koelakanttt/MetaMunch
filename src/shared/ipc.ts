@@ -1,21 +1,33 @@
 import type { ChampionSelectStatus } from './champion-select'
+import type { NetworkDiagnostics } from './diagnostics'
 import type { GeneralStatsFilters, GeneralStatsResponse } from './general-stats'
 import type { MatchHistoryFilters, MatchHistoryResponse } from './history'
+import type { MatchTimelineResponse } from './match-timeline'
 import type { LiveGameStatus } from './live-game'
 import type { MatchupsResponse } from './matchups'
-import type { PatchChangesResponse } from './patch-diff'
+import type { PatchAbilityStatus, PatchChangesRequest, PatchChangesResponse } from './patch-diff'
 import type { PostGameResult } from './post-game'
 import type { RunesResponse } from './runes'
+import type { Role } from './rules'
 import type { SynergiesResponse } from './synergies'
-import type { PurchaseOrderResponse, TimelineBackfillResult } from './timeline'
+import type { PurchaseOrderResponse, SkillOrderResponse, TimelineBackfillResult } from './timeline'
 import type { PoolResponse } from './pool'
 import type { ChampionListResponse, RecommendRequest, RecommendResponse } from './recommend-api'
 import type { RegionPlatform } from './region'
+import type {
+  ResearchCollectResult,
+  ResearchStatus,
+  ResearchSummary,
+} from './research'
+import type { RiotCircuitStatus } from './riot-status'
 import type { ThemeId } from './theme'
 
 export interface IpcChannels {
   'app:ping': { req: { message: string }; res: { reply: string; at: number } }
   'db:info': { req: Record<string, never>; res: { schemaVersion: number; sqliteVersion: string; appVersion: string } }
+  'diagnostics:network': { req: Record<string, never>; res: NetworkDiagnostics }
+  'riot:status': { req: Record<string, never>; res: RiotCircuitStatus }
+  'riot:retry': { req: Record<string, never>; res: RiotCircuitStatus }
   'staticData:status': { req: Record<string, never>; res: { version: string | null; champions: number; items: number; fetchedAt: number | null } }
   'staticData:refresh': { req: Record<string, never>; res: { version: string; fromCache: boolean; champions: number; items: number } }
   'settings:get': { req: Record<string, never>; res: { hasRiotKey: boolean; keySource: 'stored' | 'env' | null; region: RegionPlatform; leaguePath: string | null; externalStatsEnabled: boolean; theme: ThemeId } }
@@ -28,19 +40,37 @@ export interface IpcChannels {
   'matches:status': { req: Record<string, never>; res: { account: { gameName: string; tagLine: string } | null; matches: number; lastGameCreation: number | null } }
   'matches:sync': { req: Record<string, never>; res: { requested: number; saved: number; skippedExisting: number; failed: number } }
   'matches:history': { req: MatchHistoryFilters; res: MatchHistoryResponse }
+  'matches:timeline': { req: { matchId: string }; res: MatchTimelineResponse }
   'champions:list': { req: Record<string, never>; res: ChampionListResponse }
   'recommend:run': { req: RecommendRequest; res: RecommendResponse }
-  'patch:changes': { req: Record<string, never>; res: PatchChangesResponse }
+  'patch:changes': { req: PatchChangesRequest; res: PatchChangesResponse }
+  'patch:abilityStart': { req: { championIds?: string[] }; res: PatchAbilityStatus }
+  'patch:abilityStatus': { req: Record<string, never>; res: PatchAbilityStatus }
   'pool:list': { req: Record<string, never>; res: PoolResponse }
   'stats:general': { req: GeneralStatsFilters; res: GeneralStatsResponse }
+  'research:status': { req: Record<string, never>; res: ResearchStatus }
+  'research:summary': { req: Record<string, never>; res: ResearchSummary }
+  'research:start': {
+    req: { targetMatches?: number; dailyRequestCap?: number; emeraldPlus?: boolean }
+    res: ResearchStatus
+  }
+  'research:pause': { req: Record<string, never>; res: ResearchStatus }
+  'research:resume': { req: Record<string, never>; res: ResearchStatus }
+  'research:stop': { req: Record<string, never>; res: ResearchStatus }
+  'research:setOptions': {
+    req: { targetMatches?: number; dailyRequestCap?: number; emeraldPlus?: boolean }
+    res: ResearchStatus
+  }
+  'research:collect': { req: { targetMatches: number }; res: ResearchCollectResult }
   'champSelect:status': { req: Record<string, never>; res: ChampionSelectStatus }
   'timeline:purchaseOrder': { req: { championId: string }; res: PurchaseOrderResponse }
+  'timeline:skillOrder': { req: { championId: string }; res: SkillOrderResponse }
   'matches:backfillTimelines': { req: Record<string, never>; res: TimelineBackfillResult }
   'live:status': { req: Record<string, never>; res: LiveGameStatus }
   'review:last': { req: Record<string, never>; res: PostGameResult }
   'matchups:list': { req: { championId: string }; res: MatchupsResponse }
   'synergies:list': { req: { championId: string }; res: SynergiesResponse }
-  'runes:popular': { req: { championId: string }; res: RunesResponse }
+  'runes:popular': { req: { championId: string; role?: Role }; res: RunesResponse }
 }
 export type IpcChannel = keyof IpcChannels
 export type IpcReq<C extends IpcChannel> = IpcChannels[C]['req']

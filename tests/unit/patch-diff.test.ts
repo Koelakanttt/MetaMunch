@@ -5,7 +5,9 @@ import {
   diffChampion,
   diffItem,
   diffStats,
+  itemStatLines,
   previousPatchVersion,
+  shopItems,
 } from '../../src/shared/patch-diff'
 
 function makeItem(over: Partial<Item> = {}): Item {
@@ -63,10 +65,9 @@ describe('previousPatchVersion', () => {
 })
 
 describe('diffStats', () => {
-  it('reports changed and one-sided keys sorted by name', () => {
+  it('reports changed keys sorted by name and ignores one-sided keys', () => {
     expect(diffStats({ hp: 590, armor: 21 }, { hp: 600, armor: 21, mp: 400 })).toEqual([
       { label: 'hp', before: '590', after: '600' },
-      { label: 'mp', before: '—', after: '400' },
     ])
   })
 
@@ -117,33 +118,64 @@ describe('diffChampion', () => {
 })
 
 describe('diffItem', () => {
-  it('diffs cost, stats and the plain description', () => {
+  it('diffs cost and description stats, not legacy stats', () => {
     const before = makeItem({
       goldTotal: 3000,
-      stats: { FlatPhysicalDamageMod: 35 },
-      description: `<mainText>${'x'.repeat(300)}</mainText>`,
+      stats: { FlatPhysicalDamageMod: 999 },
+      description:
+        '<mainText><stats><attention>35</attention> Attack Damage</stats><br>passive old</mainText>',
     })
     const after = makeItem({
       goldTotal: 3100,
-      stats: { FlatPhysicalDamageMod: 40, FlatCritChanceMod: 0.25 },
-      description: `<mainText>${'y'.repeat(300)}</mainText>`,
+      stats: { FlatPhysicalDamageMod: 1 },
+      description:
+        '<mainText><stats><attention>40</attention> Attack Damage</stats><br>passive new</mainText>',
     })
 
     const changes = diffItem(before, after)
 
     expect(changes.map((change) => change.label)).toEqual([
       'Total cost',
-      'Stat: FlatCritChanceMod',
-      'Stat: FlatPhysicalDamageMod',
-      'Description',
+      'Stat: Attack Damage',
+      'Description text changed',
     ])
-    expect(changes[3]?.before).toHaveLength(200)
-    expect(changes[3]?.after).toHaveLength(200)
+    expect(changes[1]).toEqual({
+      label: 'Stat: Attack Damage',
+      before: '35',
+      after: '40',
+    })
+  })
+
+  it('does not report markup-only or whitespace-only description changes', () => {
+    const before = makeItem({ description: '<mainText><b>Same</b> text</mainText>' })
+    const after = makeItem({ description: '<mainText>Same   text</mainText>' })
+
+    expect(diffItem(before, after)).toEqual([])
   })
 
   it('returns no changes for equal items', () => {
     const item = makeItem()
 
     expect(diffItem(item, item)).toEqual([])
+  })
+})
+
+describe('item parsing and filters', () => {
+  it('parses stat lines from the description block', () => {
+    expect(
+      itemStatLines(
+        '<stats><attention>45</attention> Attack Damage<br><attention>20</attention> Ability Haste</stats>',
+      ),
+    ).toEqual([
+      { label: 'Attack Damage', value: '45' },
+      { label: 'Ability Haste', value: '20' },
+    ])
+  })
+
+  it('keeps shop Rift items and the lowest id per name', () => {
+    const low = makeItem({ id: 1, name: 'Same' })
+    const high = makeItem({ id: 2, name: 'Same' })
+    const locked = makeItem({ id: 3, name: 'Locked', requiredChampion: 'Ornn' })
+    expect(shopItems([high, low, locked]).map((item) => item.id)).toEqual([1])
   })
 })

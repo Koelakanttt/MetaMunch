@@ -23,8 +23,9 @@ uses only public data (Data Dragon and the Riot API).
   the last time you played it, plus your overall record for the same queues. Click a champion to
   open recommendations with it preselected.
 - **Match history.** Your recent matches with champion, role, result, queue, patch, duration and
-  final items, filtered by champion, role, queue or patch. Click a champion to open recommendations
-  with it (and its role) preselected. Only the same personal queues are stored.
+  final items, filtered by champion, role, queue or patch. A **View** action opens the stored
+  timeline for that match: purchase times and the skill level-up order. Click a champion to open
+  recommendations with it (and its role) preselected. Only the same personal queues are stored.
 - **Stats (own sample).** Champion pick/win rates and item purchase/win rates over every participant
   of your synced matches, filterable by queue and patch. A stats-source layer with a per-patch cache
   and a Settings flag is in place; no external source is configured yet, so the app always uses your
@@ -41,21 +42,30 @@ uses only public data (Data Dragon and the Riot API).
   sample by same-role lane opponents (at least 3 games per matchup), with champion icons and win
   rates. Small samples are labelled.
 - **Runes.** The most common rune pages for the selected champion from your stored sample, with
-  full rune selections when the match was synced after schema v6. Older matches show the keystone
+  full rune selections when the match was synced with schema v6+; older matches show the keystone
   only; sync new matches to fill the full page. Names and icons come from Data Dragon.
 - **Synergies.** Best with / worst with teammates for the selected champion from the stored sample,
   by same-team records (at least 3 games per duo), with champion icons and win rates.
-- **Purchase order (own sample).** Average first-purchase time per item from stored match
-  timelines. Timelines are fetched when new matches are synced; existing matches can be backfilled
-  in Settings with **Fetch timelines** (ten at a time).
+- **Purchase order (own sample).** Average first-purchase time per item and the most common
+  opening purchase paths from stored match timelines. Timelines are fetched when new matches are
+  synced; existing matches can be backfilled in Settings with **Fetch timelines** (ten at a time).
+- **Skill order (own sample).** The most common first nine skill level-ups from stored timelines,
+  with games and win rate. Requires timeline data; older matches can be backfilled in Settings.
 - **Item tips.** Recommended items show their gold cost and Data Dragon plaintext, and the icon
   tooltip repeats the price and stats summary.
+- **Research sample (alpha).** An opt-in local ladder-seeded sample (selected region,
+  Emerald/Diamond, Ranked Solo) collected through the Riot API. It is explicitly **not global**: it
+  exists to validate win/pick/ban statistics and the next recommendation engine. The app shows the
+  exact sample size and never labels it as global.
 - **Icons and builds.** Champion and item art from Data Dragon is loaded through a local,
   in-memory-cached asset protocol (`mm-asset://`) and shown in recommendations, builds, pool,
   matches, stats, patch changes, champion select and live game.
-- **Themes.** Two built-in themes: **Pixel Green** (default, terminal/pixel look with a lime accent,
-  grid background, square frames and monospace font) and **Slate** (calm dark UI). Switch in Settings;
-  add another theme by copying a `[data-theme]` block in `src/renderer/index.css`.
+- **Themes.** Three built-in themes: **Pixel Green** (default, terminal/pixel look with a lime
+  accent, grid background, square frames and monospace font), **Slate** (calm dark UI) and
+  **Reforged** (dark-fantasy look with gold accents and a serif display face). Switch in Settings;
+  add another theme by copying a `[data-theme]` block in `src/renderer/index.css`. Reforged works
+  without images; for the full artwork backdrop, put a 16:9 `background.webp` at
+  `src/renderer/public/themes/reforged/background.webp` — it is picked up automatically.
 - **Live game & post-game review.** During a game, MetaMunch reads the local Live Client Data API
   (only what you already see): your champion, your items and the enemy team, plus the next
   recommended items that fit the current game. After the game, it compares what you bought with
@@ -137,9 +147,9 @@ unsigned, so Windows SmartScreen may warn; auto-update is not enabled yet.
   lookups and match syncs; Data Dragon static data is global. After switching servers, set your
   Riot ID again. Static data comes from Data Dragon; matches come from the official Riot API.
 - Alpha does not include external statistics sites, client integration or in-game overlays.
-  Global/pro-build statistics, rank filters, ban rates and skill-order analysis need external
-  aggregate sources; they are not implemented. Purchase timing is available only for matches with
-  stored timeline data.
+  Global/pro-build statistics, rank filters and ban rates need external aggregate sources; they are
+  not implemented. Skill order and purchase timing are available only for matches with stored
+  timeline data.
 - Recommendations are heuristic. They use public champion tags and your own match history; check
   them in the client before buying.
 - No telemetry, no analytics, no accounts, no monetization.

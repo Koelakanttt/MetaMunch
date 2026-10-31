@@ -7,18 +7,23 @@ import { getSetting } from '../../src/main/db/settings-repo'
 import { createHandlers } from '../../src/main/ipc/handlers'
 import type { DataDragonProvider } from '../../src/main/providers/data-dragon'
 import type { RiotApiProvider } from '../../src/main/providers/riot-api'
+import { NetworkDiagnosticsProvider } from '../../src/main/providers/network-diagnostics'
+import { RiotRequestManager } from '../../src/main/providers/riot-request-manager'
 import { ChampionSelectService } from '../../src/main/services/champion-select-service'
 import { GeneralStatsService } from '../../src/main/services/general-stats-service'
 import { LiveGameService } from '../../src/main/services/live-game-service'
 import { MatchHistoryService } from '../../src/main/services/match-history-service'
 import { MatchSyncService } from '../../src/main/services/match-sync-service'
+import { MatchTimelineService } from '../../src/main/services/match-timeline-service'
 import { MatchupService } from '../../src/main/services/matchup-service'
 import { PatchChangesService } from '../../src/main/services/patch-changes-service'
 import { PoolService } from '../../src/main/services/pool-service'
 import { PostGameService } from '../../src/main/services/post-game-service'
 import { PurchaseOrderService } from '../../src/main/services/purchase-order-service'
 import { RecommendationService } from '../../src/main/services/recommendation-service'
+import { ResearchService } from '../../src/main/services/research-service'
 import { RuneService } from '../../src/main/services/rune-service'
+import { SkillOrderService } from '../../src/main/services/skill-order-service'
 import type { StaticDataSource } from '../../src/main/services/recommendation-service'
 import {
   RIOT_KEY_SETTING,
@@ -104,6 +109,29 @@ const purchaseOrder = new PurchaseOrderService({
   source: fakeSource,
   getAccount: () => null,
 })
+const skillOrder = new SkillOrderService({
+  db,
+  source: fakeSource,
+  getAccount: () => null,
+})
+const matchTimeline = new MatchTimelineService({
+  db,
+  source: fakeSource,
+  getAccount: () => null,
+})
+const research = new ResearchService({
+  db,
+  provider: riotProvider,
+  source: fakeSource,
+  getPatch: () => null,
+  getRegion: () => 'EUW1',
+})
+const diagnostics = new NetworkDiagnosticsProvider({
+  fetchFn: async () => new Response('{}'),
+})
+const riot = new RiotRequestManager({
+  fetchFn: async () => new Response('{}'),
+})
 const timelineBackfill = new TimelineBackfillService({
   db,
   provider: riotProvider,
@@ -126,8 +154,13 @@ const handlers = createHandlers({
   synergies,
   runes,
   purchaseOrder,
+  skillOrder,
+  matchTimeline,
+  research,
   timelineBackfill,
   settings,
+  diagnostics,
+  riot,
 })
 
 describe('ipc handlers', () => {
@@ -141,7 +174,7 @@ describe('ipc handlers', () => {
   it('reports db info', async () => {
     const res = await handlers['db:info']({})
 
-    expect(res.schemaVersion).toBe(7)
+    expect(res.schemaVersion).toBe(10)
     expect(res.sqliteVersion).toMatch(/^3\./)
     expect(res.appVersion).toBe('0.1.0-alpha')
   })
@@ -156,10 +189,10 @@ describe('ipc handlers', () => {
     ).toThrow('Update data')
   })
 
-  it('reports patch changes without an account', async () => {
+  it('reports patch changes without stored Data Dragon data', async () => {
     const res = await handlers['patch:changes']({})
 
-    expect(res.notes).toEqual(['No account set.'])
+    expect(res.notes.join(' ')).toContain('Data Dragon')
   })
 
   it('reports an empty pool without an account', () => {
@@ -293,6 +326,40 @@ describe('ipc handlers', () => {
       sampleMatches: 0,
       items: [],
       hasTimeline: false,
+    })
+  })
+
+  it('reports no skill order without static data', async () => {
+    expect(await handlers['timeline:skillOrder']({ championId: 'Garen' })).toMatchObject({
+      championId: 'Garen',
+      sampleMatches: 0,
+      orders: [],
+      hasTimeline: false,
+    })
+  })
+
+  it('reports no match timeline without an account', async () => {
+    expect(await handlers['matches:timeline']({ matchId: 'EUW1_1' })).toEqual({
+      matchId: 'EUW1_1',
+      hasTimeline: false,
+      purchases: [],
+      skills: [],
+    })
+  })
+
+  it('reports an empty research sample', async () => {
+    expect(await handlers['research:status']({})).toMatchObject({
+      snapshot: null,
+      matches: 0,
+      participants: 0,
+      bans: 0,
+      timelineEvents: 0,
+      state: 'idle',
+      coverage: [],
+    })
+    expect(await handlers['research:summary']({})).toMatchObject({
+      champions: [],
+      items: [],
     })
   })
 

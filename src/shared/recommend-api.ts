@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { EvidenceScope, ItemEvidence, LaneEvidence } from './evidence'
 import type { PersonalStats } from './personal'
 import type { Archetype, Damage, EnemyProfile } from './recommend'
 import { ROLES, type Metric } from './rules'
@@ -24,13 +25,14 @@ export interface ChampionListResponse {
 export interface RecommendationView {
   itemId: number
   name: string
-  source: 'rules' | 'core' | 'personal'
+  source: 'rules' | 'core' | 'personal' | 'research'
   reasons: string[]
   ruleIds: string[]
   score: number
   gold: number
   plaintext: string
   stats: Record<string, number>
+  evidence: ItemEvidence | null
 }
 
 export interface RecommendResponse {
@@ -42,6 +44,10 @@ export interface RecommendResponse {
   items: RecommendationView[]
   boots: RecommendationView[]
   personal: PersonalStats | null // null when no account is tracked
+  evidence: EvidenceScope | null // local research sample scope; never global
+  laneEvidence: LaneEvidence | null
+  /** Set when the champion-role has no usable research sample. */
+  researchNote: string | null
 }
 
 /** Validates an untrusted IPC payload. Throws an Error with a readable message. */

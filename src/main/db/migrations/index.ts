@@ -5,6 +5,9 @@ import itemAvailability from './0004_item_availability.sql?raw'
 import championDetails from './0005_champion_details.sql?raw'
 import fullRunes from './0006_full_runes.sql?raw'
 import timeline from './0007_timeline.sql?raw'
+import research from './0008_research.sql?raw'
+import researchStatPerks from './0009_research_stat_perks.sql?raw'
+import researchPipeline from './0010_research_pipeline.sql?raw'
 import staticData from './0002_static_data.sql?raw'
 export const migrations: readonly Migration[] = [
   { version: 1, sql: init },
@@ -14,4 +17,7 @@ export const migrations: readonly Migration[] = [
   { version: 5, sql: championDetails },
   { version: 6, sql: fullRunes },
   { version: 7, sql: timeline },
+  { version: 8, sql: research },
+  { version: 9, sql: researchStatPerks },
+  { version: 10, sql: researchPipeline },
 ]

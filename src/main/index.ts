@@ -1,5 +1,6 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, dialog, protocol, safeStorage } from 'electron'
+import { setDefaultResultOrder } from 'node:dns'
+import { app, BrowserWindow, dialog, net, protocol, safeStorage } from 'electron'
 import { regionInfo } from '@shared/region'
 import { loadChampionTags, loadRules } from './data/rules-data'
 import { getAccount } from './db/matches-repo'
@@ -15,14 +16,19 @@ import { DdragonAssetProvider } from './providers/ddragon-assets'
 import { HttpDataDragonProvider } from './providers/http-data-dragon'
 import { HttpRiotApiProvider } from './providers/http-riot-api'
 import { MissingKeyRiotApiProvider } from './providers/missing-key-riot-api'
+import { NetworkDiagnosticsProvider } from './providers/network-diagnostics'
+import { networkFetch } from './providers/network-fetch'
+import { riotFetch } from './providers/riot-fetch'
 import type { RiotApiProvider } from './providers/riot-api'
 import { RiotApiProxy } from './providers/riot-api-proxy'
+import { RiotRequestManager } from './providers/riot-request-manager'
 import { HttpRuneDataProvider } from './providers/rune-data'
 import { ChampionSelectService } from './services/champion-select-service'
 import { GeneralStatsService } from './services/general-stats-service'
 import { LiveGameService } from './services/live-game-service'
 import { MatchHistoryService } from './services/match-history-service'
 import { MatchSyncService } from './services/match-sync-service'
+import { MatchTimelineService } from './services/match-timeline-service'
 import { MatchupService } from './services/matchup-service'
 import { PatchChangesService } from './services/patch-changes-service'
 import { PersonalStatsService } from './services/personal-stats-service'
@@ -30,15 +36,21 @@ import { PoolService } from './services/pool-service'
 import { PostGameService } from './services/post-game-service'
 import { PurchaseOrderService } from './services/purchase-order-service'
 import { RecommendationService } from './services/recommendation-service'
+import { ResearchEvidenceProvider } from './services/research-evidence-provider'
+import { ResearchService } from './services/research-service'
 import { RuneService } from './services/rune-service'
 import type { SettingsCrypto } from './services/settings-service'
 import { SettingsService } from './services/settings-service'
+import { SkillOrderService } from './services/skill-order-service'
 import { StatsCoordinator } from './services/stats-coordinator'
 import { StaticDataService } from './services/static-data-service'
 import { SynergyService } from './services/synergy-service'
 import { TimelineBackfillService } from './services/timeline-backfill-service'
 
 loadEnv(app.getAppPath())
+setDefaultResultOrder('ipv4first')
+// Chromium otherwise sends a Kyber/post-quantum ClientHello that the same DPI path drops.
+app.commandLine.appendSwitch('disable-features', 'Kyber')
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -62,10 +74,27 @@ process.on('uncaughtException', (error) => {
   dialog.showErrorBox('MetaMunch error', error instanceof Error ? error.message : String(error))
 })
 
-function createRiotProvider(key: string | null, platform: string): RiotApiProvider {
-  return key
-    ? new HttpRiotApiProvider({ apiKey: key, region: regionInfo(platform).cluster })
-    : new MissingKeyRiotApiProvider()
+const chromiumFetch: typeof fetch = (input, init) =>
+  net.fetch(input instanceof URL ? input.toString() : input, init)
+
+const riotManager = new RiotRequestManager({
+  fetchFn: riotFetch,
+  fallbackFetchFn: chromiumFetch,
+  logger: (event) => console.info(JSON.stringify(event)),
+})
+
+function createRiotProvider(
+  key: string | null,
+  platform: string,
+  manager: RiotRequestManager,
+): RiotApiProvider {
+  if (!key) return new MissingKeyRiotApiProvider()
+  return new HttpRiotApiProvider({
+    apiKey: key,
+    region: regionInfo(platform).cluster,
+    platform,
+    manager,
+  })
 }
 
 const secureStorage: SettingsCrypto = {
@@ -106,7 +135,7 @@ void app.whenReady().then(() => {
   const db = openDb(join(app.getPath('userData'), 'metamunch.db'))
   runMigrations(db, migrations)
 
-  const assets = new DdragonAssetProvider()
+  const assets = new DdragonAssetProvider({ fetchFn: networkFetch })
   protocol.handle('mm-asset', async (request) => {
     try {
       const parsed = new URL(request.url)
@@ -154,11 +183,15 @@ void app.whenReady().then(() => {
     onRegionChanged: () => applyRiotProvider(),
   })
   applyRiotProvider = () => {
-    riotProxy.setProvider(createRiotProvider(settings.getKey(), settings.region()))
+    riotProxy.setProvider(createRiotProvider(settings.getKey(), settings.region(), riotManager))
   }
   applyRiotProvider()
 
-  const dataDragon = new HttpDataDragonProvider()
+  const dataDragon = new HttpDataDragonProvider({ fetchFn: networkFetch })
+  const diagnostics = new NetworkDiagnosticsProvider({
+    fetchFn: networkFetch,
+    riot: riotManager,
+  })
   const staticData = new StaticDataService({ db, provider: dataDragon })
   const matchSync = new MatchSyncService({
     db,
@@ -173,11 +206,13 @@ void app.whenReady().then(() => {
   }
   const personal = new PersonalStatsService({ db, getAccount: getTrackedAccount })
   const source = createDbSource(db)
+  const evidence = new ResearchEvidenceProvider({ db, source })
   const recommendation = new RecommendationService({
     source,
     rules: loadRules(),
     tags: loadChampionTags(),
     personal,
+    evidence,
   })
   const patchChanges = new PatchChangesService({
     db,
@@ -186,8 +221,16 @@ void app.whenReady().then(() => {
   })
   const pool = new PoolService({ db, source, getAccount: getTrackedAccount })
   const matchHistory = new MatchHistoryService({ db, source, getAccount: getTrackedAccount })
+  const matchTimeline = new MatchTimelineService({ db, source, getAccount: getTrackedAccount })
+  const research = new ResearchService({
+    db,
+    provider: riotProxy,
+    source,
+    getPatch: () => staticData.status()?.version ?? null,
+    getRegion: () => settings.region(),
+  })
   const generalStats = new StatsCoordinator({
-    own: new GeneralStatsService({ db, source }),
+    own: new GeneralStatsService({ db, source, getAccount: getTrackedAccount }),
     isExternalEnabled: () => settings.externalStatsEnabled(),
   })
   const championSelect = new ChampionSelectService({
@@ -200,9 +243,10 @@ void app.whenReady().then(() => {
   const runes = new RuneService({
     db,
     source,
-    provider: new HttpRuneDataProvider(),
+    provider: new HttpRuneDataProvider({ fetchFn: networkFetch }),
   })
   const purchaseOrder = new PurchaseOrderService({ db, source, getAccount: getTrackedAccount })
+  const skillOrder = new SkillOrderService({ db, source, getAccount: getTrackedAccount })
   const timelineBackfill = new TimelineBackfillService({
     db,
     provider: riotProxy,
@@ -227,6 +271,8 @@ void app.whenReady().then(() => {
       staticData,
       matchSync,
       matchHistory,
+      matchTimeline,
+      research,
       recommendation,
       patchChanges,
       pool,
@@ -238,8 +284,11 @@ void app.whenReady().then(() => {
       synergies,
       runes,
       purchaseOrder,
+      skillOrder,
       timelineBackfill,
       settings,
+      diagnostics,
+      riot: riotManager,
     }),
   )
   createWindow()

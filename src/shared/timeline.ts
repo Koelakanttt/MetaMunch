@@ -58,11 +58,18 @@ export interface PurchaseOrderItem {
   averageSeconds: number
 }
 
+export interface PurchasePathEntry {
+  items: { itemId: number; name: string }[]
+  games: number
+  winRate: number
+}
+
 export interface PurchaseOrderResponse {
   championId: string
   championName: string | null
   sampleMatches: number
   items: PurchaseOrderItem[]
+  paths: PurchasePathEntry[]
   hasTimeline: boolean
 }
 
@@ -70,5 +77,21 @@ export interface TimelineBackfillResult {
   requested: number
   saved: number
   failed: number
+}
+
+export interface SkillOrderEntry {
+  /** Q/W/E/R sequence in level-up order. */
+  slots: string[]
+  games: number
+  wins: number
+  winRate: number
+}
+
+export interface SkillOrderResponse {
+  championId: string
+  championName: string | null
+  sampleMatches: number
+  orders: SkillOrderEntry[]
+  hasTimeline: boolean
 }
 

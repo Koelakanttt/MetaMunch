@@ -30,9 +30,9 @@ function createProvider(
   const calls = { ids: 0, matches: 0 }
   const provider: RiotApiProvider = {
     getAccountByRiotId: async () => parseAccount(fixture('account.json')),
-    getMatchIds: async (_puuid, query) => {
+    getMatchIds: async () => {
       calls.ids += 1
-      return query.queue === 420 ? fixtureIds : []
+      return fixtureIds
     },
     getMatch: async (matchId) => {
       calls.matches += 1

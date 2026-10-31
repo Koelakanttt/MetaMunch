@@ -14,6 +14,12 @@ export interface MatchPerkStyle {
   selections: number[]
 }
 
+export interface MatchStatPerks {
+  offense: number
+  flex: number
+  defense: number
+}
+
 export interface MatchParticipant {
   participantId: number // 1..10, matches the timeline participantId
   puuid: string
@@ -25,23 +31,39 @@ export interface MatchParticipant {
   trinket: number // item6, 0 = none
   summoner1: number
   summoner2: number
+  kills: number
+  deaths: number
+  assists: number
+  goldEarned: number
+  damageToChampions: number
+  visionScore: number
+  cs: number
   keystone: number | null
   primaryStyle: number | null
   subStyle: number | null
   /** Full rune selections (keystone included), null on older matches. */
   perks: MatchPerkStyle[] | null
+  /** Stat shards (offense/flex/defense), null on older matches. */
+  statPerks: MatchStatPerks | null
+}
+
+export interface MatchBan {
+  teamId: number
+  championId: number
 }
 
 export interface Match {
   id: string // e.g. "EUW1_7000000001"
   platform: string // prefix of the id, e.g. "EUW1"
   queueId: number
+  mapId: number
   patch: string // "16.21", the first two parts of gameVersion
   gameVersion: string // e.g. "16.21.600.1234"
   gameCreation: number // epoch ms
   durationSec: number
   remake: boolean
   participants: MatchParticipant[]
+  bans: MatchBan[]
 }
 
 /** First two parts of a version string: "16.21.600.1234" -> "16.21", "16.21.1" -> "16.21". */
@@ -98,8 +120,30 @@ const ParticipantRaw = z.object({
   item6: z.number().default(0),
   summoner1Id: z.number().default(0),
   summoner2Id: z.number().default(0),
-  perks: z.object({ styles: z.array(PerkStyleRaw).default([]) }).optional(),
+  kills: z.number().default(0),
+  deaths: z.number().default(0),
+  assists: z.number().default(0),
+  goldEarned: z.number().default(0),
+  totalDamageDealtToChampions: z.number().default(0),
+  visionScore: z.number().default(0),
+  totalMinionsKilled: z.number().default(0),
+  neutralMinionsKilled: z.number().default(0),
+  perks: z.object({
+    styles: z.array(PerkStyleRaw).default([]),
+    statPerks: z
+      .object({
+        offense: z.number(),
+        flex: z.number(),
+        defense: z.number(),
+      })
+      .optional(),
+  }).optional(),
   gameEndedInEarlySurrender: z.boolean().default(false),
+})
+
+const TeamRaw = z.object({
+  teamId: z.number(),
+  bans: z.array(z.object({ championId: z.number() })).default([]),
 })
 
 const MatchRaw = z.object({
@@ -109,7 +153,9 @@ const MatchRaw = z.object({
     gameDuration: z.number(),
     gameVersion: z.string(),
     queueId: z.number(),
+    mapId: z.number().default(11),
     participants: z.array(ParticipantRaw).min(1),
+    teams: z.array(TeamRaw).default([]),
   }),
 })
 
@@ -134,6 +180,13 @@ export function parseMatch(json: unknown): Match {
       trinket: p.item6,
       summoner1: p.summoner1Id,
       summoner2: p.summoner2Id,
+      kills: p.kills,
+      deaths: p.deaths,
+      assists: p.assists,
+      goldEarned: p.goldEarned,
+      damageToChampions: p.totalDamageDealtToChampions,
+      visionScore: p.visionScore,
+      cs: p.totalMinionsKilled + p.neutralMinionsKilled,
       keystone: primary?.selections[0]?.perk ?? null,
       primaryStyle: primary?.style ?? null,
       subStyle: sub?.style ?? null,
@@ -142,12 +195,14 @@ export function parseMatch(json: unknown): Match {
           style: style.style,
           selections: style.selections.map((selection) => selection.perk),
         })) ?? null,
+      statPerks: p.perks?.statPerks ?? null,
     }
   })
   return {
     id,
     platform: id.split('_')[0] ?? '',
     queueId: info.queueId,
+    mapId: info.mapId,
     patch: toPatch(info.gameVersion),
     gameVersion: info.gameVersion,
     gameCreation: info.gameCreation,
@@ -156,5 +211,10 @@ export function parseMatch(json: unknown): Match {
       info.gameDuration < REMAKE_MAX_SECONDS ||
       info.participants.some((p) => p.gameEndedInEarlySurrender),
     participants,
+    bans: info.teams.flatMap((team) =>
+      team.bans
+        .filter((ban) => ban.championId > 0)
+        .map((ban) => ({ teamId: team.teamId, championId: ban.championId })),
+    ),
   }
 }

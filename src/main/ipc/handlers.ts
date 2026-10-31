@@ -1,18 +1,23 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { IpcHandlers } from '@shared/ipc'
 import { getSchemaVersion } from '../db/migrate'
+import type { NetworkDiagnosticsProvider } from '../providers/network-diagnostics'
+import type { RiotRequestManager } from '../providers/riot-request-manager'
 import type { ChampionSelectService } from '../services/champion-select-service'
 import type { LiveGameService } from '../services/live-game-service'
 import type { MatchHistoryService } from '../services/match-history-service'
 import type { MatchSyncService } from '../services/match-sync-service'
+import type { MatchTimelineService } from '../services/match-timeline-service'
 import type { MatchupService } from '../services/matchup-service'
 import type { PatchChangesService } from '../services/patch-changes-service'
 import type { PoolService } from '../services/pool-service'
 import type { PostGameService } from '../services/post-game-service'
 import type { PurchaseOrderService } from '../services/purchase-order-service'
 import type { RecommendationService } from '../services/recommendation-service'
+import type { ResearchService } from '../services/research-service'
 import type { RuneService } from '../services/rune-service'
 import type { SettingsService } from '../services/settings-service'
+import type { SkillOrderService } from '../services/skill-order-service'
 import type { StatsCoordinator } from '../services/stats-coordinator'
 import type { StaticDataService } from '../services/static-data-service'
 import type { SynergyService } from '../services/synergy-service'
@@ -24,6 +29,8 @@ export function createHandlers(deps: {
   staticData: StaticDataService
   matchSync: MatchSyncService
   matchHistory: MatchHistoryService
+  matchTimeline: MatchTimelineService
+  research: ResearchService
   recommendation: RecommendationService
   patchChanges: PatchChangesService
   pool: PoolService
@@ -35,8 +42,11 @@ export function createHandlers(deps: {
   synergies: SynergyService
   runes: RuneService
   purchaseOrder: PurchaseOrderService
+  skillOrder: SkillOrderService
   timelineBackfill: TimelineBackfillService
   settings: SettingsService
+  diagnostics: NetworkDiagnosticsProvider
+  riot: RiotRequestManager
 }): IpcHandlers {
   return {
     'app:ping': ({ message }) => ({ reply: 'pong: ' + message, at: Date.now() }),
@@ -70,6 +80,16 @@ export function createHandlers(deps: {
       externalStatsEnabled: deps.settings.externalStatsEnabled(),
       theme: deps.settings.theme(),
     }),
+    'diagnostics:network': () =>
+      deps.diagnostics.run({
+        apiKey: deps.settings.getKey(),
+        region: deps.settings.region(),
+      }),
+    'riot:status': () => deps.riot.status(),
+    'riot:retry': () => {
+      deps.riot.resetCircuit()
+      return deps.riot.status()
+    },
     'settings:setRiotKey': ({ key }) => {
       deps.settings.saveRiotKey(key)
       return { ok: true }
@@ -97,18 +117,30 @@ export function createHandlers(deps: {
     'matches:status': () => deps.matchSync.status(),
     'matches:sync': () => deps.matchSync.sync(),
     'matches:history': (filters) => deps.matchHistory.list(filters),
+    'matches:timeline': ({ matchId }) => deps.matchTimeline.forMatch(matchId),
     'champions:list': () => deps.recommendation.listChampions(),
     'recommend:run': (req) => deps.recommendation.run(req),
-    'patch:changes': () => deps.patchChanges.run(),
+    'patch:changes': (request) => deps.patchChanges.run(request),
+    'patch:abilityStart': ({ championIds }) => deps.patchChanges.startAbilityLoad(championIds),
+    'patch:abilityStatus': () => deps.patchChanges.abilityStatus(),
     'pool:list': () => deps.pool.list(),
     'stats:general': (filters) => deps.generalStats.run(filters),
+    'research:status': () => deps.research.status(),
+    'research:summary': () => deps.research.summary(),
+    'research:start': (options) => deps.research.start(options),
+    'research:pause': () => deps.research.pause(),
+    'research:resume': () => deps.research.resume(),
+    'research:stop': () => deps.research.stop(),
+    'research:setOptions': (options) => deps.research.setOptions(options),
+    'research:collect': ({ targetMatches }) => deps.research.collect(targetMatches),
     'champSelect:status': () => deps.championSelect.status(),
     'timeline:purchaseOrder': ({ championId }) => deps.purchaseOrder.forChampion(championId),
+    'timeline:skillOrder': ({ championId }) => deps.skillOrder.forChampion(championId),
     'matches:backfillTimelines': () => deps.timelineBackfill.run(),
     'live:status': () => deps.liveGame.status(),
     'review:last': () => deps.postGame.review(),
     'matchups:list': ({ championId }) => deps.matchups.forChampion(championId),
     'synergies:list': ({ championId }) => deps.synergies.forChampion(championId),
-    'runes:popular': ({ championId }) => deps.runes.popular(championId),
+    'runes:popular': ({ championId, role }) => deps.runes.popular(championId, role),
   }
 }

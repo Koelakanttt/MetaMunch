@@ -9,24 +9,58 @@ export interface Change {
   after: string
 }
 
+export type EntityStatus = 'added' | 'removed' | 'changed' | 'unchanged'
+
 export interface EntityChanges {
   id: string
   name: string
+  status: EntityStatus
   changes: Change[]
+}
+
+export interface PatchChangesRequest {
+  from?: string
+  to?: string
+  allItems?: boolean
+  poolOnly?: boolean
+}
+
+export interface PatchAbilityProgress {
+  loaded: number
+  total: number
+  running: boolean
+  errors: number
+}
+
+export interface PatchAbilityStatus {
+  from: string | null
+  to: string | null
+  progress: PatchAbilityProgress
+  changes: Record<string, Change[]>
+}
+
+export interface PatchChangesSummary {
+  championsChanged: number
+  itemsChanged: number
+  added: number
+  removed: number
 }
 
 export interface PatchChangesResponse {
   from: string | null
   to: string | null
+  versions: string[]
   pool: { id: string; name: string; games: number }[]
   champions: EntityChanges[]
   items: EntityChanges[]
+  summary: PatchChangesSummary
+  abilityProgress: PatchAbilityProgress
   notes: string[]
 }
 
 const VERSION_PATTERN = /^\d+\.\d+\.\d+$/
 const SPELL_LETTERS = ['Q', 'W', 'E', 'R'] as const
-const DESCRIPTION_LIMIT = 200
+const DESCRIPTION_LIMIT = 240
 
 export function previousPatchVersion(
   versions: readonly string[],
@@ -40,6 +74,11 @@ export function previousPatchVersion(
   return null
 }
 
+/** Newest first Data Dragon versions usable in the from/to selectors. */
+export function recentVersions(versions: readonly string[], limit = 12): string[] {
+  return versions.filter((version) => VERSION_PATTERN.test(version)).slice(0, limit)
+}
+
 export function diffStats(
   before: Record<string, number>,
   after: Record<string, number>,
@@ -51,14 +90,95 @@ export function diffStats(
   for (const key of keys) {
     const beforeValue = before[key]
     const afterValue = after[key]
-    if (beforeValue !== undefined && afterValue !== undefined && beforeValue === afterValue) continue
+    if (beforeValue === undefined || afterValue === undefined) continue
+    if (beforeValue === afterValue) continue
     changes.push({
       label: key,
-      before: beforeValue === undefined ? '—' : String(beforeValue),
-      after: afterValue === undefined ? '—' : String(afterValue),
+      before: String(beforeValue),
+      after: String(afterValue),
     })
   }
   return changes
+}
+
+export interface ItemStatLine {
+  label: string
+  value: string
+}
+
+/** Values + labels from the description <stats> block; legacy item.stats is deliberately ignored. */
+export function itemStatLines(description: string): ItemStatLine[] {
+  const block = /<stats>([\s\S]*?)<\/stats>/i.exec(description)?.[1]
+  if (!block) return []
+  const lines: ItemStatLine[] = []
+  for (const segment of block.split(/<br\s*\/?>/i)) {
+    const match = /<attention>([^<]+)<\/attention>\s*([\s\S]*)$/i.exec(segment)
+    if (!match?.[1] || !match[2]) continue
+    const label = plainText(match[2]).trim()
+    const value = plainText(match[1]).trim()
+    if (label && value) lines.push({ label, value })
+  }
+  return lines
+}
+
+function statLineChanges(before: Item, after: Item): Change[] {
+  const beforeLines = new Map(itemStatLines(before.description).map((line) => [line.label, line.value]))
+  const afterLines = new Map(itemStatLines(after.description).map((line) => [line.label, line.value]))
+  const changes: Change[] = []
+  for (const [label, beforeValue] of beforeLines) {
+    const afterValue = afterLines.get(label)
+    if (afterValue === undefined || afterValue === beforeValue) continue
+    changes.push({
+      label: `Stat: ${label}`,
+      before: beforeValue,
+      after: afterValue,
+    })
+  }
+  return changes
+}
+
+export function diffItem(before: Item, after: Item): Change[] {
+  const changes: Change[] = []
+  if (before.goldTotal !== after.goldTotal) {
+    changes.push({
+      label: 'Total cost',
+      before: String(before.goldTotal),
+      after: String(after.goldTotal),
+    })
+  }
+  changes.push(...statLineChanges(before, after))
+
+  const beforeText = plainText(before.description)
+  const afterText = plainText(after.description)
+  if (beforeText !== afterText) {
+    changes.push({
+      label: 'Description text changed',
+      before: beforeText.slice(0, DESCRIPTION_LIMIT),
+      after: afterText.slice(0, DESCRIPTION_LIMIT),
+    })
+  }
+  return changes
+}
+
+export function lowestIdByName(items: readonly Item[]): Map<string, Item> {
+  const byName = new Map<string, Item>()
+  for (const item of items) {
+    const existing = byName.get(item.name)
+    if (!existing || item.id < existing.id) byName.set(item.name, item)
+  }
+  return byName
+}
+
+/** Shop-complete Summoner's Rift items, deduplicated by name keeping the lowest id. */
+export function shopItems(items: readonly Item[]): Item[] {
+  return [...lowestIdByName(items).values()].filter(
+    (item) =>
+      item.maps['11'] === true &&
+      item.purchasable &&
+      item.inStore &&
+      item.requiredAlly === null &&
+      item.requiredChampion === null,
+  )
 }
 
 function renderArray(values: readonly number[]): string {
@@ -79,6 +199,7 @@ function arrayChange(
   return { label, before: renderArray(beforeValues), after: renderArray(afterValues) }
 }
 
+/** Ability/detail diff. Base stats are diffed separately from champion.json. */
 export function diffChampion(before: ChampionDetail, after: ChampionDetail): Change[] {
   const changes = diffStats(before.stats, after.stats)
 
@@ -119,34 +240,6 @@ export function diffChampion(before: ChampionDetail, after: ChampionDetail): Cha
       )
       if (change) changes.push(change)
     }
-  }
-
-  return changes
-}
-
-export function diffItem(before: Item, after: Item): Change[] {
-  const changes: Change[] = []
-
-  if (before.goldTotal !== after.goldTotal) {
-    changes.push({
-      label: 'Total cost',
-      before: String(before.goldTotal),
-      after: String(after.goldTotal),
-    })
-  }
-
-  for (const change of diffStats(before.stats, after.stats)) {
-    changes.push({ ...change, label: `Stat: ${change.label}` })
-  }
-
-  const beforeText = plainText(before.description)
-  const afterText = plainText(after.description)
-  if (beforeText !== afterText) {
-    changes.push({
-      label: 'Description',
-      before: beforeText.slice(0, DESCRIPTION_LIMIT),
-      after: afterText.slice(0, DESCRIPTION_LIMIT),
-    })
   }
 
   return changes

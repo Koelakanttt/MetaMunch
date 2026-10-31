@@ -37,3 +37,33 @@
 - 2026-10-29 Static mode: onboarding can be skipped without a Riot key; key required only for personal match sync — awaiting owner checks
 - 2026-10-29 Timeline support: schema v7, match timelines, purchase-order averages, Settings backfill — awaiting owner checks
 - 2026-10-29 Backend recorded in docs/backend-roadmap.md (deferred until local app is complete)
+- 2026-10-29 Timeline skill order (first nine level-ups) + UI card/tests — awaiting owner checks
+- 2026-10-29 Fixed GamePage live enemy key typecheck error — awaiting owner checks
+- 2026-10-29 Purchase paths (typical opening) from timelines — awaiting owner checks
+- 2026-10-29 Per-match timeline details (purchases + skill order) in Match history — awaiting owner checks
+- 2026-10-29 Visual polish: sidebar shell, New matchup header, role tabs, two-column recommendation rail — awaiting owner checks
+- 2026-10-29 Reforged theme (dark-fantasy, gold accent, optional CSS background hook) — awaiting owner checks
+- 2026-10-30 Research Phase A: sample schema v8, ladder-seeded collector, sample summary UI — awaiting owner checks
+- 2026-10-30 Math prior B1: item stat/gold utility, threat weights, constrained build beam search — awaiting owner checks
+- 2026-10-30 Evidence B2: local sample smoothing, item evidence in recommendations, sample scope/confidence UI — awaiting owner checks
+- 2026-10-30 B3: math-optimal build exposed, research lane-matchup evidence in summary — awaiting owner checks
+- 2026-10-30 Detailed rune pages: full primary/secondary grids, stat shards, research page WR/games — awaiting owner checks
+- 2026-10-30 Riot sync network diagnostics: Chromium net.fetch, retries, actionable DNS/proxy errors — awaiting owner checks
+- 2026-10-30 Network fallback: IPv4-first Node fetch with Chromium proxy fallback for Riot and Data Dragon — awaiting owner checks
+- 2026-10-30 Settings network diagnostics: Data Dragon/Riot checks and IPv4/IPv6 DNS results — awaiting owner checks
+- 2026-10-30 Network third fallback: raw OpenSSL HTTPS request when undici and Electron net time out — awaiting owner checks
+- 2026-10-30 Riot path hardening: Riot API tries OpenSSL first, browser-like UA, no-key reachability check — awaiting owner checks
+- 2026-10-30 Riot transport fallback: Windows curl/Schannel for api.riotgames.com only, token via stdin — awaiting owner checks
+- 2026-10-30 Match sync: all Summoner's Rift queues (incl. 1441/Swiftplay), ARAM/Arena/TFT filtered by map — awaiting owner checks
+- 2026-10-30 Network layer: one shared Riot manager (2 concurrent, retries, 429, circuit breaker, key-safe logs) — awaiting owner checks
+- 2026-10-30 Patch changes: whole-patch Data Dragon diff, lazy 3-concurrent ability details, selectors/tabs/filters — awaiting owner checks
+- 2026-10-30 Removed src/renderer/pages/RecommendPage.tsx math-optimal build panel and math-prior copy; formula-only values were not data.
+- 2026-10-30 Removed src/shared/recommend.ts math utility ranking and personal builds under 5 games; low-sample/formula values must not rank.
+- 2026-10-30 Removed src/renderer/pages/RecommendPage.tsx adjusted personal win rate; raw record with games and low-sample mark only.
+- 2026-10-30 Removed src/renderer/pages/PoolPage.tsx adjusted pool win rates and empty-sample 0% record; raw values with sample marks only.
+- 2026-10-30 Removed src/renderer/pages/RecommendPage.tsx empty Stat Mods grid/default highlight; section appears only with stored stat shards.
+- 2026-10-30 Removed confidence labels from recommendation/lane evidence; source and game count remain visible.
+- 2026-10-30 Removed pool-only default from Patch changes; the full patch is default and the owner pool is an optional filter.
+- 2026-10-30 Research pipeline: resumable ranked-solo crawler, compact sample rows, SQL aggregation, Wilson ordering, previous-patch fallback, research core/runes/boots and crawl progress UI — awaiting owner checks.
+- 2026-10-31 Diagnostics/circuit: platform-routed status URL, half-open cooldown recovery, 5s single-attempt probes, transport attempts in UI; Stats uses tracked-account games only — awaiting owner checks.
+- 2026-10-31 Riot transport: undici TLS 1.2 agent for Node, Chromium Kyber disabled; documented ISP TLS 1.3 DPI workaround — awaiting owner checks.

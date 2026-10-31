@@ -9,8 +9,7 @@ function errorMessage(reason: unknown): string {
 }
 
 function winRate(entry: PoolEntry): number {
-  const rate = entry.lowSample ? entry.adjustedWinRate : entry.wins / entry.games
-  return Math.round(rate * 100)
+  return Math.round((entry.wins / Math.max(1, entry.games)) * 100)
 }
 
 export function PoolPage({
@@ -66,29 +65,28 @@ export function PoolPage({
         <p className="font-medium">
           {data.account.gameName}#{data.account.tagLine}
         </p>
-        {data.overall ? (
+        {data.overall && data.overall.games > 0 ? (
           <>
             <StatusLine>
               {`${data.overall.games} games, ${data.overall.wins} wins (${Math.round(
-                (data.overall.lowSample
-                  ? data.overall.adjustedWinRate
-                  : data.overall.wins / Math.max(1, data.overall.games)) * 100,
+                (data.overall.wins / Math.max(1, data.overall.games)) * 100,
               )}%)`}
               {data.overall.lowSample ? ' · low sample' : ''}
             </StatusLine>
             <StatusLine tone="muted">
-              Only normal, ranked solo and ranked flex games are counted. ARAM and remakes are
-              ignored.
+              Own sample. All Summoner&apos;s Rift queues are counted; ARAM and remakes are ignored.
             </StatusLine>
           </>
-        ) : null}
+        ) : (
+          <StatusLine tone="muted">No data yet. Sync matches in Settings.</StatusLine>
+        )}
       </Card>
 
       <Card title="Champion pool">
         {!data.hasStaticData ? (
           <EmptyState>No static data yet. Press &quot;Update data&quot; in Settings.</EmptyState>
         ) : data.entries.length === 0 ? (
-          <EmptyState>No matches yet. Sync your matches in Settings.</EmptyState>
+          <EmptyState>No data yet. Sync matches in Settings.</EmptyState>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -124,7 +122,7 @@ export function PoolPage({
                     <td className="py-2 pr-3 text-slate-300">
                       {winRate(entry)}%
                       {entry.lowSample ? (
-                        <span className="ml-1 text-[11px] text-slate-500">adjusted</span>
+                        <span className="ml-1 text-[11px] text-slate-500">low sample</span>
                       ) : null}
                     </td>
                     <td className="py-2 text-slate-400">

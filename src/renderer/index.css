@@ -28,6 +28,7 @@
   --mm-border-width: 2px;
   --mm-shadow: 5px 5px 0 rgba(184, 255, 90, 0.14);
   --mm-font: 'Consolas', 'Lucida Console', 'Courier New', monospace;
+  --mm-font-display: 'Consolas', 'Lucida Console', 'Courier New', monospace;
   --mm-grid: rgba(184, 255, 90, 0.05);
 }
 
@@ -54,6 +55,35 @@
   --mm-border-width: 1px;
   --mm-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   --mm-font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mm-font-display: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mm-grid: transparent;
+}
+
+[data-theme='reforged'] {
+  --mm-page: #08090d;
+  --mm-header: rgba(10, 12, 17, 0.92);
+  --mm-surface: rgba(17, 21, 28, 0.92);
+  --mm-surface-2: rgba(10, 13, 18, 0.92);
+  --mm-badge: #1b2029;
+  --mm-border: #3a3833;
+  --mm-text: #e9e4da;
+  --mm-muted: #9a9387;
+  --mm-accent: #c9a86a;
+  --mm-accent-hover: #dfc187;
+  --mm-accent-ink: #0b0d10;
+  --mm-success: #7ed6a6;
+  --mm-danger: #e46d72;
+  --mm-warning: #d6ad63;
+  --mm-secondary: #1b2029;
+  --mm-secondary-hover: #262d38;
+  --mm-hover: #202631;
+  --mm-radius: 0.75rem;
+  --mm-radius-pill: 9999px;
+  --mm-border-width: 1px;
+  --mm-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
+  --mm-font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mm-font-display: 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+  --mm-bg-image: none;
   --mm-grid: transparent;
 }
 
@@ -67,6 +97,23 @@ body {
   background-color: var(--mm-page);
   color: var(--mm-text);
   font-family: var(--mm-font);
+}
+
+[data-theme] h1,
+[data-theme] h2,
+[data-theme] h3 {
+  font-family: var(--mm-font-display, var(--mm-font));
+}
+
+[data-theme='reforged'] body {
+  background-attachment: fixed;
+  background-image:
+    var(--mm-bg-image),
+    radial-gradient(ellipse at 78% -8%, rgba(132, 39, 42, 0.35), transparent 55%),
+    radial-gradient(ellipse at 4% 18%, rgba(31, 70, 74, 0.26), transparent 52%),
+    radial-gradient(ellipse at 50% 105%, rgba(76, 56, 35, 0.2), transparent 60%),
+    linear-gradient(180deg, #0b0d12 0%, #07080b 100%);
+  background-size: cover;
 }
 
 .mm-app,

@@ -7,13 +7,13 @@ import type {
   RecommendationView,
   RecommendResponse,
 } from '@shared/recommend-api'
-import type { RunesResponse } from '@shared/runes'
+import type { PopularRunePage, RuneRef, RunesResponse } from '@shared/runes'
 import type { SynergiesResponse, SynergyEntry } from '@shared/synergies'
-import type { PurchaseOrderResponse } from '@shared/timeline'
+import type { PurchaseOrderResponse, SkillOrderResponse } from '@shared/timeline'
 import { ROLES, type Role } from '@shared/rules'
 import { ChampionPicker } from '../components/ChampionPicker'
 import { ChampionIcon, ItemIcon, RuneIcon } from '../components/Icon'
-import { Button, Card, EmptyState, Label, Select, StatusLine } from '../components/ui'
+import { Button, Card, EmptyState, Label, StatusLine } from '../components/ui'
 
 function invokeErrorMessage(reason: unknown): string {
   const message = reason instanceof Error ? reason.message : String(reason)
@@ -26,8 +26,13 @@ function names(list: string[]): string {
 
 function recommendationLabel(item: RecommendationView): string {
   if (item.source === 'personal') return 'your build'
+  if (item.source === 'research') return 'research sample'
   if (item.source === 'core') return 'class core'
   return 'rules'
+}
+
+function formatGames(games: number): string {
+  return games >= 1000 ? `${(games / 1000).toFixed(1)}k` : String(games)
 }
 
 function itemHint(item: RecommendationView): string {
@@ -36,7 +41,24 @@ function itemHint(item: RecommendationView): string {
     .join(' · ')
 }
 
-function RecommendationList({ items }: { items: RecommendationView[] }) {
+function evidenceLine(item: RecommendationView, sourceLabel?: string): string | null {
+  const evidence = item.evidence
+  if (!evidence) return null
+  const sign = evidence.deltaWinRate >= 0 ? '+' : ''
+  return `${Math.round(evidence.winRate * 100)}% WR · ${Math.round(
+    evidence.pickRate * 100,
+  )}% pick · ${sign}${(evidence.deltaWinRate * 100).toFixed(1)}pp · ${
+    evidence.games
+  } games${sourceLabel ? ` · ${sourceLabel}` : ''}${evidence.games < 5 ? ' · low sample' : ''}`
+}
+
+function RecommendationList({
+  items,
+  sourceLabel,
+}: {
+  items: RecommendationView[]
+  sourceLabel?: string
+}) {
   if (items.length === 0) return <EmptyState>none</EmptyState>
 
   return (
@@ -54,6 +76,11 @@ function RecommendationList({ items }: { items: RecommendationView[] }) {
             </div>
             {itemHint(item) ? (
               <div className="text-[11px] text-slate-500">{itemHint(item)}</div>
+            ) : null}
+            {evidenceLine(item, sourceLabel) ? (
+              <div className="text-[11px] text-emerald-400">
+                {evidenceLine(item, sourceLabel)}
+              </div>
             ) : null}
             <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-slate-400">
               {item.reasons.map((reason, index) => (
@@ -80,7 +107,7 @@ function BuildStrip({ items }: { items: RecommendationView[] }) {
     <div className="flex flex-wrap items-center gap-1">
       {unique.map((item, index) => (
         <span key={item.itemId} className="flex items-center gap-1">
-          <ItemIcon itemId={item.itemId} name={item.name} hint={itemHint(item)} size={34} />
+          <ItemIcon itemId={item.itemId} name={item.name} hint={itemHint(item)} size={42} />
           {index < unique.length - 1 ? <span className="text-xs text-slate-500">→</span> : null}
         </span>
       ))}
@@ -104,7 +131,7 @@ function PersonalStatsBlock({
   if (!personal) return <StatusLine tone="muted">Personal stats: no account set.</StatusLine>
 
   const rawWinRate = personal.games === 0 ? 0 : personal.wins / personal.games
-  const winRate = Math.round((personal.lowSample ? personal.adjustedWinRate : rawWinRate) * 100)
+  const winRate = Math.round(rawWinRate * 100)
 
   return (
     <div className="space-y-2">
@@ -112,17 +139,10 @@ function PersonalStatsBlock({
       {personal.games === 0 ? (
         <StatusLine tone="muted">No games on {meName} yet.</StatusLine>
       ) : (
-        <>
-          <StatusLine>
-            {`${meName}: ${personal.games} games, ${personal.wins} wins (${winRate}%)`}
-            {personal.lowSample ? ' · low sample, adjusted' : ''}
-          </StatusLine>
-          {personal.lowSample ? (
-            <StatusLine tone="muted">
-              Win rate is adjusted toward your account average on small samples.
-            </StatusLine>
-          ) : null}
-        </>
+        <StatusLine>
+          {`${meName}: ${personal.games} games, ${personal.wins} wins (${winRate}%)`}
+          {personal.lowSample ? ' · low sample' : ''}
+        </StatusLine>
       )}
       {personal.build.length > 0 ? (
         <div>
@@ -193,12 +213,12 @@ function MatchupBlock({ data, error }: { data: MatchupsResponse | null; error: s
   if (data.strong.length === 0 && data.weak.length === 0) {
     return (
       <EmptyState>
-        Not enough same-role games yet (at least 3 per matchup). Sync more matches.
+        Not enough same-role games yet (at least 5 per matchup). Sync more matches.
       </EmptyState>
     )
   }
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="space-y-3">
       <MatchupColumn title="Strong against" entries={data.strong} tone="text-emerald-400" />
       <MatchupColumn title="Weak against" entries={data.weak} tone="text-rose-400" />
     </div>
@@ -214,12 +234,12 @@ function SynergyBlock({ data, error }: { data: SynergiesResponse | null; error: 
   if (data.best.length === 0 && data.worst.length === 0) {
     return (
       <EmptyState>
-        Not enough games with the same teammates yet (at least 3 per duo). Sync more matches.
+        Not enough games with the same teammates yet (at least 5 per duo). Sync more matches.
       </EmptyState>
     )
   }
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="space-y-3">
       <SynergyColumn title="Best with" entries={data.best} tone="text-emerald-400" />
       <SynergyColumn title="Worst with" entries={data.worst} tone="text-rose-400" />
     </div>
@@ -295,6 +315,159 @@ function PurchaseOrderBlock({
           </li>
         ))}
       </ul>
+      {data.paths.length > 0 ? (
+        <div className="space-y-1">
+          <p className="text-[11px] uppercase tracking-wide text-slate-400">Typical opening</p>
+          <ul className="space-y-1">
+            {data.paths.map((path) => (
+              <li
+                key={path.items.map((item) => item.itemId).join('-')}
+                className="flex items-center gap-1 text-xs"
+              >
+                <div className="flex flex-1 flex-wrap items-center gap-1">
+                  {path.items.map((item, index) => (
+                    <span key={item.itemId} className="flex items-center gap-1">
+                      <ItemIcon itemId={item.itemId} name={item.name} size={22} />
+                      {index < path.items.length - 1 ? (
+                        <span className="text-slate-600">→</span>
+                      ) : null}
+                    </span>
+                  ))}
+                </div>
+                <span className="text-slate-500">{path.games}g</span>
+                <span className="text-emerald-400">{Math.round(path.winRate * 100)}%</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function SkillOrderBlock({ data, error }: { data: SkillOrderResponse | null; error: string }) {
+  if (error) return <StatusLine tone="error">error: {error}</StatusLine>
+  if (!data) return <StatusLine tone="muted">loading skill order…</StatusLine>
+  if (!data.hasTimeline) {
+    return (
+      <EmptyState>
+        No timeline data yet. Sync new matches or use &quot;Fetch timelines&quot; in Settings.
+      </EmptyState>
+    )
+  }
+  if (data.orders.length === 0) return <EmptyState>No skill level-ups in the sample.</EmptyState>
+  return (
+    <div className="space-y-2">
+      <StatusLine tone="muted">
+        {`${data.sampleMatches} matches with skill data; first 9 level-ups.`}
+      </StatusLine>
+      <ul className="space-y-1">
+        {data.orders.map((order) => (
+          <li key={order.slots.join('')} className="flex items-center gap-2 text-xs">
+            <span className="flex-1 truncate text-slate-300">{order.slots.join(' → ')}</span>
+            <span className="text-emerald-400">{Math.round(order.winRate * 100)}%</span>
+            <span className="text-slate-500">{order.games}g</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+function RuneGrid({
+  slots,
+  selected,
+  size,
+}: {
+  slots: RuneRef[][]
+  selected: readonly RuneRef[]
+  size: number
+}) {
+  if (slots.length === 0) return null
+  const selectedIds = new Set(selected.map((rune) => rune.id))
+  return (
+    <div className="space-y-1">
+      {slots.map((row, index) => (
+        <div key={index} className="grid grid-cols-3 justify-items-center gap-1">
+          {row.map((rune) => (
+            <RuneIcon
+              key={rune.id}
+              iconPath={rune.icon}
+              name={rune.name}
+              size={size}
+              className={
+                selectedIds.has(rune.id)
+                  ? 'ring-1 ring-emerald-400'
+                  : 'opacity-20 grayscale'
+              }
+            />
+          ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function RunePageDetail({
+  page,
+  source,
+  championGames,
+}: {
+  page: PopularRunePage
+  source: string
+  championGames?: number
+}) {
+  const label = `${Math.round(page.winRate * 10000) / 100}% Win Rate`
+  const sample =
+    championGames && championGames > 0
+      ? `${page.games.toLocaleString()} of ${championGames.toLocaleString()} games`
+      : `${page.games.toLocaleString()} games`
+  return (
+    <div className="space-y-3">
+      <div
+        className={
+          page.statShards.length > 0
+            ? 'grid grid-cols-[1.2fr_1fr_0.8fr] gap-2'
+            : 'grid grid-cols-2 gap-2'
+        }
+      >
+        <div>
+          <p className="mb-1 text-center text-[10px] uppercase tracking-wide text-slate-400">
+            Primary Runes
+          </p>
+          <RuneGrid slots={page.primarySlots} selected={page.primaryRunes} size={27} />
+        </div>
+        <div>
+          <p className="mb-1 text-center text-[10px] uppercase tracking-wide text-slate-400">
+            Secondary
+          </p>
+          <RuneGrid slots={page.secondarySlots} selected={page.secondaryRunes} size={25} />
+        </div>
+        {page.statShards.length > 0 ? (
+          <div>
+            <p className="mb-1 text-center text-[10px] uppercase tracking-wide text-slate-400">
+              Stat Mods
+            </p>
+            <div className="grid grid-cols-3 justify-items-center gap-1">
+              {page.statShards.map((shard) => (
+                <RuneIcon
+                  key={shard.id}
+                  iconPath={shard.icon}
+                  name={shard.name}
+                  size={22}
+                  className="ring-1 ring-emerald-400"
+                />
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+      <div className="text-center">
+        <div className="text-base font-semibold text-emerald-400">{label}</div>
+        <div className="text-[11px] text-slate-400">
+          {`${sample}${page.pickRate === undefined ? '' : ` · ${Math.round(page.pickRate * 100)}% pick`} · ${source}${page.lowSample ? ' · low sample' : ''}`}
+        </div>
+      </div>
     </div>
   )
 }
@@ -305,62 +478,64 @@ function RuneBlock({ data, error }: { data: RunesResponse | null; error: string 
   if (!data.hasStaticData) {
     return <EmptyState>No static data. Update it in Settings to see runes.</EmptyState>
   }
-  if (data.pages.length === 0) {
+
+  const ownPage = data.pages[0]
+  const researchPage = data.researchPages[0]
+  const page = researchPage ?? ownPage
+  const source = researchPage ? 'research sample' : 'your sample'
+  const alternatives = researchPage
+    ? data.researchPages.slice(1)
+    : data.pages.slice(1)
+
+  if (!page) {
     return (
       <EmptyState>
-        No rune pages in the stored sample yet. Sync matches with rune data.
+        No data yet. Sync matches or collect a research sample to see rune pages.
       </EmptyState>
     )
   }
+
   return (
     <>
       {data.note ? <StatusLine tone="muted">{data.note}</StatusLine> : null}
-      <ul className="space-y-2">
-        {data.pages.map((page) => (
-          <li
-            key={`${page.keystone.id}-${page.primaryRunes.map((rune) => rune.id).join('-')}-${page.secondaryRunes.map((rune) => rune.id).join('-')}`}
-            className="flex items-center gap-3 rounded-lg border border-slate-800 bg-slate-950/60 p-2"
-          >
-            <RuneIcon iconPath={page.keystone.icon} name={page.keystone.name} size={34} />
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-baseline gap-2">
-                <strong className="text-sm font-medium text-slate-100">
-                  {page.keystone.name}
-                </strong>
-                <span className="text-[11px] text-slate-500">
-                  {`${page.primaryTree.name} / ${page.secondaryTree.name}`}
-                </span>
-              </div>
-              <div className="mt-1 flex flex-wrap items-center gap-1">
-                {page.primaryRunes.map((rune) => (
-                  <RuneIcon key={`p-${rune.id}`} iconPath={rune.icon} name={rune.name} size={22} />
-                ))}
-                {page.secondaryRunes.length > 0 ? (
-                  <>
-                    <span className="mx-1 text-xs text-slate-600">/</span>
-                    {page.secondaryRunes.map((rune) => (
-                      <RuneIcon
-                        key={`s-${rune.id}`}
-                        iconPath={rune.icon}
-                        name={rune.name}
-                        size={20}
-                      />
-                    ))}
-                  </>
-                ) : null}
-              </div>
-              <div className="text-[11px] text-slate-400">
-                {`${Math.round(page.winRate * 100)}% · ${page.games} games${page.lowSample ? ' · low sample' : ''}${page.fullRunes ? '' : ' · keystone only'}`}
-              </div>
-              {!page.fullRunes ? (
-                <div className="text-[11px] text-slate-500">
-                  Sync new matches to store full rune selections.
+      {data.researchScope && researchPage ? (
+        <StatusLine tone="muted">
+          {`${data.researchScope.region} · ${data.researchScope.rankScope} · ${
+            data.researchScope.fallback && data.researchScope.samplePatch
+              ? `from patch ${data.researchScope.samplePatch}, ${formatGames(
+                  data.researchScope.championGames ?? researchPage.games,
+                )} games`
+              : `patch ${data.researchScope.patch} · ${formatGames(
+                  data.researchScope.championGames ?? researchPage.games,
+                )} games`
+          } (not global)`}
+        </StatusLine>
+      ) : null}
+      <RunePageDetail
+        page={page}
+        source={source}
+        championGames={data.researchScope?.championGames}
+      />
+      {alternatives.length > 0 ? (
+        <div className="space-y-1">
+          <p className="text-[11px] uppercase tracking-wide text-slate-400">Other pages</p>
+          <ul className="space-y-1">
+            {alternatives.map((entry) => (
+              <li key={`${entry.keystone.id}-${entry.games}-${entry.wins}`}>
+                <div
+                  className="flex w-full items-center gap-2 rounded-md border border-slate-800 bg-slate-950/50 p-1.5 text-left text-[11px] text-slate-400"
+                  title={`${entry.keystone.name}: ${entry.games} games`}
+                >
+                  <RuneIcon iconPath={entry.keystone.icon} name={entry.keystone.name} size={22} />
+                  <span className="min-w-0 flex-1 truncate">{entry.keystone.name}</span>
+                  <span>{`${Math.round(entry.winRate * 100)}%`}</span>
+                  <span className="text-slate-600">{`${entry.games}g`}</span>
                 </div>
-              ) : null}
-            </div>
-          </li>
-        ))}
-      </ul>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
     </>
   )
 }
@@ -476,6 +651,8 @@ export function RecommendPage({
   const [runeError, setRuneError] = useState('')
   const [purchaseOrder, setPurchaseOrder] = useState<PurchaseOrderResponse | null>(null)
   const [purchaseOrderError, setPurchaseOrderError] = useState('')
+  const [skillOrder, setSkillOrder] = useState<SkillOrderResponse | null>(null)
+  const [skillOrderError, setSkillOrderError] = useState('')
   const requestIdRef = useRef(0)
   const resultChampionId = result?.me.id ?? null
 
@@ -566,9 +743,33 @@ export function RecommendPage({
     let cancelled = false
 
     const run = async (): Promise<void> => {
+      setSkillOrderError('')
+      try {
+        const response = await window.api.invoke('timeline:skillOrder', { championId })
+        if (!cancelled) setSkillOrder(response)
+      } catch (reason) {
+        if (!cancelled) {
+          setSkillOrder(null)
+          setSkillOrderError(invokeErrorMessage(reason))
+        }
+      }
+    }
+
+    void run()
+    return () => {
+      cancelled = true
+    }
+  }, [resultChampionId, refreshKey])
+
+  useEffect(() => {
+    const championId = resultChampionId
+    if (!championId) return
+    let cancelled = false
+
+    const run = async (): Promise<void> => {
       setRuneError('')
       try {
-        const response = await window.api.invoke('runes:popular', { championId })
+        const response = await window.api.invoke('runes:popular', { championId, role })
         if (!cancelled) setRunes(response)
       } catch (reason) {
         if (!cancelled) {
@@ -582,7 +783,7 @@ export function RecommendPage({
     return () => {
       cancelled = true
     }
-  }, [resultChampionId])
+  }, [resultChampionId, role])
 
   useEffect(() => {
     let cancelled = false
@@ -722,9 +923,22 @@ export function RecommendPage({
   const laneName = championList.champions.find((champion) => champion.id === enemyIds[0])?.name ?? null
   const laneRecord =
     matchups?.all.find((entry) => entry.championId === enemyIds[0]) ?? null
+  const researchCore = result?.core.some((item) => item.source === 'research') ?? false
+  const levelLabel = researchCore
+    ? 'research core'
+    : result?.level === 'rules'
+      ? 'rules'
+      : 'core fallback'
 
   return (
     <section className="space-y-4">
+      <div>
+        <h2 className="text-2xl font-semibold tracking-tight">New matchup</h2>
+        <p className="text-sm text-slate-400">
+          Pick both sides of the lane; the build and stored sample update below.
+        </p>
+      </div>
+
       <Card title="Lane matchup">
         <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] lg:items-end">
           <div
@@ -733,7 +947,7 @@ export function RecommendPage({
           >
             <Label>Your champion</Label>
             <div className="flex items-center gap-3">
-              <ChampionIcon championId={meId} size={56} />
+              <ChampionIcon championId={meId} size={72} />
               <div className="min-w-0 flex-1">
                 <ChampionPicker
                   label="You"
@@ -762,7 +976,7 @@ export function RecommendPage({
           <div className="space-y-2 rounded-lg border border-slate-700 bg-slate-950/60 p-3">
             <Label>Lane opponent · priority</Label>
             <div className="flex items-center gap-3">
-              <ChampionIcon championId={enemyIds[0] ?? null} size={56} />
+              <ChampionIcon championId={enemyIds[0] ?? null} size={72} />
               <div className="min-w-0 flex-1">
                 <ChampionPicker
                   label="Enemy pick"
@@ -778,20 +992,25 @@ export function RecommendPage({
         </div>
 
         <div className="flex flex-wrap items-end gap-3">
-          <label className="flex w-40 flex-col gap-1">
+          <div className="space-y-1">
             <Label>Role</Label>
-            <Select value={role} onChange={(event) => setRole(event.target.value as Role)}>
+            <div className="flex flex-wrap gap-1">
               {ROLES.map((value) => (
-                <option key={value} value={value}>
+                <Button
+                  key={value}
+                  variant={role === value ? 'primary' : 'ghost'}
+                  className="px-3 py-1.5 text-xs"
+                  onClick={() => setRole(value)}
+                >
                   {value}
-                </option>
+                </Button>
               ))}
-            </Select>
-          </label>
+            </div>
+          </div>
           <div className="space-y-1">
             <StatusLine tone="muted">
               {meId && enemyIds[0]
-                ? 'The build below is calculated for your champion against this lane opponent.'
+                ? 'The build below is based on the selected champions and any stored sample.'
                 : 'Pick both sides of the lane to see the build.'}
             </StatusLine>
             {meId && enemyIds[0] ? (
@@ -822,53 +1041,94 @@ export function RecommendPage({
           <StatusLine tone="error">error: {error}</StatusLine>
         </Card>
       ) : result ? (
-        <>
-          <Card title="Summary">
-            <div className="flex flex-wrap items-center gap-3">
-              <ChampionIcon championId={result.me.id} name={result.me.name} size={48} />
-              {enemyIds[0] ? (
-                <>
-                  <span className="text-xs font-semibold tracking-widest text-slate-500">VS</span>
-                  <ChampionIcon championId={enemyIds[0]} size={48} />
-                </>
-              ) : null}
-              <div className="space-y-1">
-                <StatusLine>
-                  {`patch ${result.version} · ${result.level === 'rules' ? 'rules' : 'core fallback'} · build for ${result.me.name} vs ${laneName ?? 'lane opponent'} (${result.me.damage}, ${result.me.archetype})`}
-                </StatusLine>
-                {result.profile.metrics.enemies > 0 ? (
-                  <StatusLine tone="muted">
-                    {`Enemy team: ${Math.round(result.profile.metrics.adShare * 100)}% physical / ${Math.round(result.profile.metrics.apShare * 100)}% magic · healers: ${names(result.profile.names.healers)} · hard CC: ${names(result.profile.names.hardCc)} · tanks: ${names(result.profile.names.tanks)}`}
-                  </StatusLine>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="space-y-4">
+            <Card title="Summary">
+              <div className="flex flex-wrap items-center gap-3">
+                <ChampionIcon championId={result.me.id} name={result.me.name} size={48} />
+                {enemyIds[0] ? (
+                  <>
+                    <span className="text-xs font-semibold tracking-widest text-slate-500">
+                      VS
+                    </span>
+                    <ChampionIcon championId={enemyIds[0]} size={48} />
+                  </>
                 ) : null}
-                <StatusLine tone="muted">
-                  Rune pages from your own sample are shown below.
-                </StatusLine>
+                <div className="space-y-1">
+                  <StatusLine>
+                    {`patch ${result.version} · ${levelLabel} · build for ${result.me.name} vs ${laneName ?? 'lane opponent'} (${result.me.damage}, ${result.me.archetype})`}
+                  </StatusLine>
+                  {result.profile.metrics.enemies > 0 ? (
+                    <StatusLine tone="muted">
+                      {`Enemy team: ${Math.round(result.profile.metrics.adShare * 100)}% physical / ${Math.round(result.profile.metrics.apShare * 100)}% magic · healers: ${names(result.profile.names.healers)} · hard CC: ${names(result.profile.names.hardCc)} · tanks: ${names(result.profile.names.tanks)}`}
+                    </StatusLine>
+                  ) : null}
+                  <StatusLine tone="muted">
+                    Rune pages come from your sample or the research sample; the source is labeled.
+                  </StatusLine>
+                  <StatusLine tone="muted">
+                    {result.researchNote
+                      ? result.researchNote
+                      : result.evidence
+                        ? `Research sample: ${result.evidence.region} · ${result.evidence.rankScope} · queue ${result.evidence.queueId} · ${
+                            result.evidence.fallback && result.evidence.samplePatch
+                              ? `from patch ${result.evidence.samplePatch}, ${formatGames(result.evidence.championGames)} games`
+                              : `patch ${result.evidence.patch} · ${formatGames(result.evidence.championGames)} games on this champion/role`
+                          } (not global).`
+                        : 'No data yet. Start the research crawl on the Research page.'}
+                  </StatusLine>
+                  {result.laneEvidence ? (
+                    <StatusLine>
+                      {`vs ${result.laneEvidence.enemyName}: ${Math.round(
+                        result.laneEvidence.winRate * 100,
+                      )}% WR · ${result.laneEvidence.games} games · research sample${result.laneEvidence.games < 5 ? ' · low sample' : ''} · ${result.laneEvidence.deltaWinRate >= 0 ? '+' : ''}${(
+                        result.laneEvidence.deltaWinRate * 100
+                      ).toFixed(1)}pp`}
+                    </StatusLine>
+                  ) : null}
+                </div>
               </div>
+              <div className="space-y-1">
+                <p className="text-[11px] uppercase tracking-wide text-slate-400">
+                  Suggested items
+                </p>
+                <BuildStrip items={[...result.core, ...result.items, ...result.boots]} />
+              </div>
+            </Card>
+
+            <Card title="Core">
+              <RecommendationList
+                items={result.core}
+                sourceLabel={researchCore ? 'research sample' : undefined}
+              />
+            </Card>
+
+            <Card title="Situational">
+              <RecommendationList
+                items={result.items}
+                sourceLabel={result.evidence ? 'research sample' : undefined}
+              />
+            </Card>
+
+            <Card title="Boots">
+              <RecommendationList
+                items={result.boots}
+                sourceLabel={result.evidence ? 'research sample' : undefined}
+              />
+            </Card>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Card title="Purchase order (own sample)">
+                <PurchaseOrderBlock data={purchaseOrder} error={purchaseOrderError} />
+              </Card>
+
+              <Card title="Skill order (own sample)">
+                <SkillOrderBlock data={skillOrder} error={skillOrderError} />
+              </Card>
             </div>
-            <div className="space-y-1">
-              <p className="text-[11px] uppercase tracking-wide text-slate-400">Suggested items</p>
-              <BuildStrip items={[...result.core, ...result.items, ...result.boots]} />
-            </div>
-          </Card>
+          </div>
 
-          <Card title="Core">
-            <RecommendationList items={result.core} />
-          </Card>
-
-          <Card title="Situational">
-            <RecommendationList items={result.items} />
-          </Card>
-
-          <Card title="Boots">
-            <RecommendationList items={result.boots} />
-          </Card>
-
-          <Card title="Purchase order (own sample)">
-            <PurchaseOrderBlock data={purchaseOrder} error={purchaseOrderError} />
-          </Card>
-
-          <div className="grid gap-4 lg:grid-cols-2">
+          <aside className="space-y-4">
             <Card title="Matchups (own sample)">
               <MatchupBlock data={matchups} error={matchupError} />
             </Card>
@@ -876,16 +1136,16 @@ export function RecommendPage({
             <Card title="Synergies (own sample)">
               <SynergyBlock data={synergies} error={synergyError} />
             </Card>
-          </div>
 
-          <Card title="Runes (own sample)">
-            <RuneBlock data={runes} error={runeError} />
-          </Card>
+            <Card title="Runes">
+              <RuneBlock data={runes} error={runeError} />
+            </Card>
 
-          <Card title="Personal stats">
-            <PersonalStatsBlock personal={result.personal} meName={result.me.name} />
-          </Card>
-        </>
+            <Card title="Personal stats">
+              <PersonalStatsBlock personal={result.personal} meName={result.me.name} />
+            </Card>
+          </aside>
+        </div>
       ) : null}
 
       <Card title="Other enemies">

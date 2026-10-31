@@ -105,6 +105,30 @@ describe('GeneralStatsService', () => {
     expect(result.items[0]?.name).toMatch(/^Item \d+$/)
   })
 
+  it('uses only the tracked account when a getAccount provider is supplied', () => {
+    const db = memoryDb()
+    insertMatch(db, {
+      id: 'EUW1_OWN',
+      queue: 420,
+      creation: 1000,
+      participants: [
+        { team: 100, champion: GAREN, win: true, puuid: 'me' },
+        { team: 200, champion: AHRI, win: false },
+      ],
+    })
+    const service = new GeneralStatsService({
+      db,
+      source: source('16.3.1'),
+      getAccount: () => ({ puuid: 'me' }),
+    })
+
+    const result = service.run()
+
+    expect(result.sample).toEqual({ matches: 1, picks: 1 })
+    expect(result.champions.map((entry) => entry.championId)).toEqual(['Garen'])
+    expect(result.champions.find((entry) => entry.championId === 'Ahri')).toBeUndefined()
+  })
+
   it('handles an empty sample', () => {
     const service = new GeneralStatsService({ db: memoryDb(), source: source('16.3.1') })
 

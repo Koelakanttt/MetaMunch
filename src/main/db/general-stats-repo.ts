@@ -28,9 +28,14 @@ export function sampleRows(
   db: DatabaseSync,
   filters: { patch?: string; queue?: number } = {},
   queues: readonly number[] = PERSONAL_QUEUES,
+  puuid: string | null = null,
 ): SampleRow[] {
   const clauses = ['m.remake = 0', `m.queue_id IN (${placeholders(queues.length)})`]
   const params: (string | number)[] = [...queues]
+  if (puuid !== null) {
+    clauses.push('p.puuid = ?')
+    params.push(puuid)
+  }
   if (filters.patch) {
     clauses.push('m.patch = ?')
     params.push(filters.patch)
@@ -59,12 +64,16 @@ export function sampleRows(
 export function samplePatches(
   db: DatabaseSync,
   queues: readonly number[] = PERSONAL_QUEUES,
+  puuid: string | null = null,
 ): string[] {
+  const clue = puuid === null
+    ? ''
+    : ' AND EXISTS (SELECT 1 FROM participants p WHERE p.match_id = m.match_id AND p.puuid = ?)'
   const rows = db
     .prepare(
-      `SELECT DISTINCT patch FROM matches
-       WHERE remake = 0 AND queue_id IN (${placeholders(queues.length)})`,
+      `SELECT DISTINCT m.patch AS patch FROM matches m
+       WHERE m.remake = 0 AND m.queue_id IN (${placeholders(queues.length)})${clue}`,
     )
-    .all(...queues)
+    .all(...queues, ...(puuid === null ? [] : [puuid]))
   return rows.map((row) => String(row['patch']))
 }

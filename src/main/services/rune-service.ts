@@ -1,10 +1,29 @@
 import type { DatabaseSync } from 'node:sqlite'
-import type { Rune, RuneRef, RuneTree, RunesResponse } from '@shared/runes'
+import type {
+  PopularRunePage,
+  Rune,
+  RuneRef,
+  RuneTree,
+  RunesResponse,
+  ResearchRuneScope,
+} from '@shared/runes'
+import { statShardRef } from '@shared/runes'
+import type { Role } from '@shared/rules'
+import { toPatch } from '@shared/riot'
+import { championRoleTotals } from '../db/research-aggregate-repo'
+import {
+  previousResearchSnapshot,
+  researchSnapshotForPatch,
+} from '../db/research-repo'
+import { researchRunePageTotals } from '../db/research-rune-repo'
+import type { RunePageRow } from '../db/rune-repo'
 import { runePageTotals } from '../db/rune-repo'
 import type { RuneDataProvider } from '../providers/rune-data'
 import type { StaticDataSource } from './recommendation-service'
 
-const MIN_GAMES = 3
+const MIN_GAMES = 5
+const MIN_RESEARCH_GAMES = 30
+const MIN_RESEARCH_CHAMPION_GAMES = 100
 
 interface StoredPerkStyle {
   style: number
@@ -34,12 +53,37 @@ function parsePerks(value: string | null): StoredPerkStyle[] | null {
   }
 }
 
+function parseStatShards(value: string | null | undefined): RuneRef[] {
+  if (!value) return []
+  try {
+    const parsed: unknown = JSON.parse(value)
+    if (typeof parsed !== 'object' || parsed === null) return []
+    const record = parsed as Record<string, unknown>
+    return ['offense', 'flex', 'defense']
+      .map((key) => record[key])
+      .filter((id): id is number => typeof id === 'number')
+      .map(statShardRef)
+  } catch {
+    return []
+  }
+}
+
 function ref(id: number, name: string | undefined, icon: string | undefined): RuneRef {
   return {
     id,
     name: name ?? `Rune ${id}`,
     icon: icon && icon.length > 0 ? icon : null,
   }
+}
+
+function treeSlots(
+  tree: RuneTree | undefined,
+  runeById: ReadonlyMap<number, Rune>,
+): RuneRef[][] {
+  if (!tree) return []
+  return tree.slots.map((slot) =>
+    slot.runes.map((rune) => ref(rune.id, runeById.get(rune.id)?.name, runeById.get(rune.id)?.icon)),
+  )
 }
 
 export interface RuneDeps {
@@ -60,7 +104,7 @@ export class RuneService {
     this.provider = deps.provider
   }
 
-  async popular(championId: string): Promise<RunesResponse> {
+  async popular(championId: string, role?: Role): Promise<RunesResponse> {
     const version = this.source.latestVersion()
     const champions = version === null ? [] : this.source.champions(version)
     const me = champions.find((champion) => champion.id === championId)
@@ -70,18 +114,55 @@ export class RuneService {
         championId,
         championName: null,
         pages: [],
+        researchPages: [],
+        researchScope: null,
         hasStaticData: version !== null,
         note: null,
       }
     }
 
     const rows = runePageTotals(this.db, me.key)
-    if (rows.length === 0) {
+    const currentPatch = version === null ? null : toPatch(version)
+    const currentSnapshot = currentPatch ? researchSnapshotForPatch(this.db, currentPatch) : null
+    const previousSnapshot = currentPatch ? previousResearchSnapshot(this.db, currentPatch) : null
+    const currentGames =
+      currentSnapshot && role
+        ? championRoleTotals(this.db, currentSnapshot.id, me.key, role).games
+        : 0
+    const snapshot =
+      currentSnapshot && currentGames >= MIN_RESEARCH_CHAMPION_GAMES
+        ? currentSnapshot
+        : previousSnapshot
+    const fallback = snapshot !== null && snapshot !== currentSnapshot
+    const researchRows =
+      role && snapshot
+        ? researchRunePageTotals(this.db, snapshot.id, me.key, role).filter(
+            (row) => row.games >= MIN_RESEARCH_GAMES,
+          )
+        : []
+    const sampleGames = role && snapshot
+      ? championRoleTotals(this.db, snapshot.id, me.key, role).games
+      : 0
+    const researchScope: ResearchRuneScope | null =
+      researchRows.length > 0 && snapshot
+        ? {
+            region: snapshot.region,
+            rankScope: snapshot.rankScope,
+            patch: currentPatch ?? snapshot.patch,
+            samplePatch: snapshot.patch,
+            fallback,
+            championGames: sampleGames,
+          }
+        : null
+
+    if (rows.length === 0 && researchRows.length === 0) {
       return {
         version,
         championId,
         championName: me.name,
         pages: [],
+        researchPages: [],
+        researchScope: null,
         hasStaticData: true,
         note: null,
       }
@@ -109,44 +190,64 @@ export class RuneService {
       }
     }
 
-    const pages = rows.map((row) => {
-      const keystone = keystoneById.get(row.keystone)
-      const primary = styleById.get(row.primaryStyle)
-      const secondary = styleById.get(row.subStyle)
-      const stored = parsePerks(row.perks)
-      const primarySelections =
-        stored?.find((style) => style.style === row.primaryStyle)?.selections ?? []
-      const secondarySelections =
-        stored?.find((style) => style.style === row.subStyle)?.selections ?? []
-      const primaryRunes =
-        primarySelections.length > 0
-          ? primarySelections.map((id) =>
-              ref(id, runeById.get(id)?.name, runeById.get(id)?.icon),
-            )
-          : [ref(row.keystone, keystone?.name, keystone?.icon)]
-      const secondaryRunes = secondarySelections.map((id) =>
-        ref(id, runeById.get(id)?.name, runeById.get(id)?.icon),
-      )
+    const toPages = (
+      pageRows: RunePageRow[],
+      lowSampleBelow: number,
+      totalGames?: number,
+    ): PopularRunePage[] =>
+      pageRows
+        .map((row) => {
+        const keystone = keystoneById.get(row.keystone)
+        const primary = styleById.get(row.primaryStyle)
+        const secondary = styleById.get(row.subStyle)
+        const stored = parsePerks(row.perks)
+        const primarySelections =
+          stored?.find((style) => style.style === row.primaryStyle)?.selections ?? []
+        const secondarySelections =
+          stored?.find((style) => style.style === row.subStyle)?.selections ?? []
+        const primaryRunes =
+          primarySelections.length > 0
+            ? primarySelections.map((id) =>
+                ref(id, runeById.get(id)?.name, runeById.get(id)?.icon),
+              )
+            : [ref(row.keystone, keystone?.name, keystone?.icon)]
+        const secondaryRunes = secondarySelections.map((id) =>
+          ref(id, runeById.get(id)?.name, runeById.get(id)?.icon),
+        )
 
-      return {
-        keystone: ref(row.keystone, keystone?.name, keystone?.icon),
-        primaryTree: ref(row.primaryStyle, primary?.name, primary?.icon),
-        secondaryTree: ref(row.subStyle, secondary?.name, secondary?.icon),
-        primaryRunes,
-        secondaryRunes,
-        fullRunes: stored !== null,
-        games: row.games,
-        wins: row.wins,
-        winRate: row.games === 0 ? 0 : row.wins / row.games,
-        lowSample: row.games < MIN_GAMES,
-      }
-    })
+        return {
+          keystone: ref(row.keystone, keystone?.name, keystone?.icon),
+          primaryTree: ref(row.primaryStyle, primary?.name, primary?.icon),
+          secondaryTree: ref(row.subStyle, secondary?.name, secondary?.icon),
+          primaryRunes,
+          secondaryRunes,
+          primarySlots: treeSlots(primary, runeById),
+          secondarySlots: treeSlots(secondary, runeById).slice(1),
+          statShards: parseStatShards(row.statPerks),
+          fullRunes: stored !== null,
+          games: row.games,
+          wins: row.wins,
+          winRate: row.games === 0 ? 0 : row.wins / row.games,
+          ...(totalGames !== undefined && totalGames > 0
+            ? { pickRate: row.games / totalGames }
+            : {}),
+          lowSample: row.games < lowSampleBelow,
+        }
+        })
+        .sort(
+          (a, b) =>
+            Number(a.lowSample) - Number(b.lowSample) ||
+            b.games - a.games ||
+            a.keystone.id - b.keystone.id,
+        )
 
     return {
       version,
       championId,
       championName: me.name,
-      pages,
+      pages: toPages(rows, MIN_GAMES),
+      researchPages: toPages(researchRows, MIN_RESEARCH_GAMES, researchScope?.championGames),
+      researchScope,
       hasStaticData: true,
       note,
     }

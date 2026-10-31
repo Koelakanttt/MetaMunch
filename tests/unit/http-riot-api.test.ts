@@ -74,7 +74,9 @@ describe('HttpRiotApiProvider', () => {
 
     expect(calls[0]?.url).toBe(ACCOUNT_URL)
     expect(calls[0]?.token).toBe(TEST_KEY)
-    expect(calls[0]?.userAgent).toBe('MetaMunch (personal project)')
+    expect(calls[0]?.userAgent).toBe(
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) MetaMunch/0.1.0-alpha Chrome/131.0.0.0 Safari/537.36',
+    )
     expect(calls[1]?.url).toBe(IDS_URL)
     expect(calls[2]?.url).toBe(MATCH_URL)
     expect(calls[3]?.url).toBe(TIMELINE_URL)

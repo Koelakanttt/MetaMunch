@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Champion, Item } from '../../src/shared/ddragon'
 import { loadChampionTags, loadRules } from '../../src/main/data/rules-data'
 import { RecommendationService, type PersonalStatsProvider, type StaticDataSource } from '../../src/main/services/recommendation-service'
+import type { EvidenceProvider } from '../../src/main/services/research-evidence-provider'
 import { mkItem, stats } from '../helpers/items'
 
 function champ(id: string, name: string, tags: string[], attack: number, magic: number, defense = 5, mp = 300): Champion {
@@ -106,7 +107,7 @@ describe('RecommendationService.run', () => {
         wins: 3,
         lowSample: false,
         adjustedWinRate: 0.6,
-        build: [{ itemId: 4, name: 'Black Cleaver', games: 4 }],
+        build: [{ itemId: 4, name: 'Black Cleaver', games: 5 }],
         vs: [],
       }),
     }
@@ -115,9 +116,69 @@ describe('RecommendationService.run', () => {
 
     expect(r.core).toHaveLength(1)
     expect(r.core[0]?.source).toBe('personal')
-    expect(r.core[0]?.reasons).toEqual(['In your usual build (4 of 5 games).'])
+    expect(r.core[0]?.reasons).toEqual(['In your usual build (5 of 5 games).'])
     expect(r.level).toBe('core')
   })
+  it('uses research core items, boots and the research note', () => {
+    const source: StaticDataSource = {
+      latestVersion: () => '16.21.1',
+      champions: () => champions,
+      items: () => items,
+    }
+    const evidence: EvidenceProvider = {
+      forChampion: () => ({
+        scope: {
+          patch: '16.21',
+          region: 'EUW1',
+          queueId: 420,
+          rankScope: 'MASTER+',
+          championGames: 100,
+        },
+        items: new Map(),
+        research: {
+          scope: {
+            patch: '16.21',
+            samplePatch: '16.21',
+            region: 'EUW1',
+            rankScope: 'MASTER+',
+            championGames: 100,
+            fallback: false,
+          },
+          games: 100,
+          wins: 55,
+          items: [
+            { itemId: 4, slot: 0, games: 90, wins: 50, winRate: 50 / 90, pickRate: 0.9 },
+          ],
+          boots: { itemId: 5, slot: 5, games: 80, wins: 44, winRate: 44 / 80, pickRate: 0.8 },
+          rune: null,
+          lanes: [],
+        },
+      }),
+    }
+    const service = new RecommendationService({
+      source,
+      rules: loadRules(),
+      tags: loadChampionTags(),
+      evidence,
+    })
+
+    const r = service.run({ meId: 'Garen', role: 'TOP', enemyIds: [] })
+
+    expect(r.researchNote).toBeNull()
+    expect(r.core.map((item) => item.name)).toEqual(['Black Cleaver'])
+    expect(r.core[0]?.source).toBe('research')
+    expect(r.boots.map((item) => item.name)).toEqual(['Chainlaced Crushers'])
+    expect(r.boots[0]?.source).toBe('research')
+    expect(r.core[0]?.evidence?.games).toBe(90)
+  })
+
+  it('names the missing research champion and role', () => {
+    const r = service().run({ meId: 'Garen', role: 'TOP', enemyIds: [] })
+    expect(r.researchNote).toBe(
+      'No research sample for Garen TOP yet: start the research crawl on the Research page.',
+    )
+  })
+
   it('asks to update the data when nothing is stored', () => {
     expect(() => service(null).run(request)).toThrow('Update data')
   })

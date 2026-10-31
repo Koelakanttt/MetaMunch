@@ -1,4 +1,6 @@
 import type { Champion, Item } from './ddragon'
+import type { EvidenceBundle, ItemEvidence } from './evidence'
+import type { ResearchBuildSample, ResearchItemSample } from './research'
 import { buildItemPool, itemTraits, type Trait } from './item-traits'
 import type {
   Archetype,
@@ -31,10 +33,11 @@ export interface Recommendation {
   itemId: number
   name: string
   slot: 'item' | 'boots'
-  source: 'rules' | 'core' | 'personal'
+  source: 'rules' | 'core' | 'personal' | 'research'
   reasons: string[]
   ruleIds: string[]
   score: number
+  evidence?: ItemEvidence
 }
 
 export interface RecommendResult {
@@ -53,6 +56,8 @@ export interface RecommendInput {
   tags: ChampionTags
   rules: Rules
   prior?: { games: number; build: { name: string; games: number }[] }
+  evidence?: EvidenceBundle
+  research?: ResearchBuildSample
 }
 
 export const MAX_ITEMS = 6
@@ -259,6 +264,7 @@ function compatible(
 interface Scored {
   item: Item
   ruleScore: number
+  data?: ItemEvidence
   reasons: { weight: number; text: string }[]
   ruleIds: string[]
 }
@@ -266,6 +272,11 @@ interface Scored {
 interface Ranked extends Scored {
   fit: Fit
   score: number
+}
+
+function evidenceBonus(evidence: ItemEvidence | undefined): number {
+  if (!evidence || evidence.games < 5) return 0
+  return evidence.deltaWinRate * 100
 }
 
 function byRank(a: Ranked, b: Ranked): number {
@@ -276,6 +287,7 @@ function pickSituational(
   slot: 'item' | 'boots',
   pool: readonly Item[],
   traitsOf: ReadonlyMap<number, Trait[]>,
+  evidenceOf: ReadonlyMap<number, ItemEvidence>,
   input: RecommendInput,
   myDamage: Damage,
   archetype: Archetype,
@@ -302,7 +314,13 @@ function pickSituational(
       const matched = rule.anyOf.filter((t) => traits.includes(t)).length
       if (rule.anyOf.length > 0 && matched === 0) continue
       const bonus = rule.anyOf.length > 1 ? 0.5 * (matched - 1) : 0
-      const entry = scored.get(item.id) ?? { item, ruleScore: 0, reasons: [], ruleIds: [] }
+      const entry = scored.get(item.id) ?? {
+        item,
+        ruleScore: 0,
+        data: evidenceOf.get(item.id),
+        reasons: [],
+        ruleIds: [],
+      }
       entry.ruleScore += rule.weight + bonus
       entry.reasons.push({ weight: rule.weight, text })
       entry.ruleIds.push(rule.id)
@@ -315,7 +333,11 @@ function pickSituational(
     if (entry.ruleScore < MIN_RULE_SCORE) continue
     const fit = fitOf(profile, traitsOf.get(entry.item.id) ?? [])
     if (fit.avoided.length > 0 && fit.matched.length === 0) continue
-    ranked.push({ ...entry, fit, score: entry.ruleScore + fit.score })
+    ranked.push({
+      ...entry,
+      fit,
+      score: entry.ruleScore + fit.score + evidenceBonus(entry.data),
+    })
   }
   ranked.sort(byRank)
 
@@ -349,6 +371,7 @@ function pickSituational(
       reasons,
       ruleIds: entry.ruleIds,
       score: entry.score,
+      evidence: entry.data,
     })
     if (picked.length >= limit) break
   }
@@ -376,6 +399,7 @@ function findClassCore(input: RecommendInput, myDamage: Damage): ClassCore | nul
 function classCore(
   pool: readonly Item[],
   traitsOf: ReadonlyMap<number, Trait[]>,
+  evidenceOf: ReadonlyMap<number, ItemEvidence>,
   input: RecommendInput,
   myDamage: Damage,
   profile: ArchetypeProfile,
@@ -383,22 +407,25 @@ function classCore(
   const spec = findClassCore(input, myDamage)
   if (!spec) return []
 
-  const scored: { item: Item; matched: number }[] = []
+  const scored: { item: Item; matched: number; data?: ItemEvidence }[] = []
   for (const item of pool) {
     const traits = traitsOf.get(item.id) ?? []
     if (!compatible(traits, input.me, myDamage, 'item')) continue
     const matched = spec.traits.filter((trait) => traits.includes(trait)).length
     if (matched < 2) continue
-    scored.push({ item, matched })
+    scored.push({ item, matched, data: evidenceOf.get(item.id) })
   }
 
   return scored
     .sort(
       (a, b) =>
-        b.matched - a.matched || b.item.goldTotal - a.item.goldTotal || a.item.id - b.item.id,
+        b.matched - a.matched ||
+        evidenceBonus(b.data) - evidenceBonus(a.data) ||
+        b.item.goldTotal - a.item.goldTotal ||
+        a.item.id - b.item.id,
     )
     .slice(0, CORE_TARGET)
-    .map(({ item, matched }) => {
+    .map(({ item, matched, data }) => {
       const fit = fitOf(profile, traitsOf.get(item.id) ?? [])
       return {
         itemId: item.id,
@@ -408,6 +435,7 @@ function classCore(
         reasons: [`${spec.reason} ${fitSentence(profile, fit.matched)}`],
         ruleIds: [`core:${spec.key}`],
         score: matched,
+        evidence: data,
       }
     })
 }
@@ -419,12 +447,13 @@ function personalCore(
   myDamage: Damage,
 ): Recommendation[] {
   const prior = input.prior
-  if (!prior || prior.games < 3) return []
+  if (!prior || prior.games < 5) return []
 
   const byName = new Map(pool.map((item) => [item.name, item]))
   const core: Recommendation[] = []
   for (const entry of prior.build) {
     if (core.length >= CORE_TARGET) break
+    if (entry.games < 5) continue
     const item = byName.get(entry.name)
     if (!item) continue
     if (core.some((picked) => picked.name === item.name)) continue
@@ -442,6 +471,86 @@ function personalCore(
   return core
 }
 
+function confidenceFor(games: number): ItemEvidence['confidence'] {
+  if (games >= 200) return 'high'
+  if (games >= 50) return 'medium'
+  return 'low'
+}
+
+function researchEvidence(
+  sample: ResearchItemSample,
+  championGames: number,
+  championWins: number,
+): ItemEvidence {
+  const prior = championGames === 0 ? 0 : championWins / championGames
+  const smoothed = (sample.wins + 50 * prior) / (sample.games + 50)
+  return {
+    itemId: sample.itemId,
+    games: sample.games,
+    wins: sample.wins,
+    winRate: sample.winRate,
+    smoothedWinRate: smoothed,
+    deltaWinRate: smoothed - prior,
+    pickRate: sample.pickRate,
+    confidence: confidenceFor(sample.games),
+  }
+}
+
+/** Core from the research sample: slot-wise final items, never a recorded path. */
+function researchCore(
+  research: ResearchBuildSample,
+  itemsById: ReadonlyMap<number, Item>,
+  role: Role,
+): Recommendation[] {
+  const seen = new Set<number>()
+  const core: Recommendation[] = []
+  for (const sample of research.items) {
+    if (core.length >= CORE_TARGET) break
+    if (sample.games < 30 || seen.has(sample.itemId)) continue
+    const item = itemsById.get(sample.itemId)
+    if (!item) continue
+    seen.add(sample.itemId)
+    core.push({
+      itemId: item.id,
+      name: item.name,
+      slot: 'item',
+      source: 'research',
+      reasons: [
+        `Picked in ${Math.round(sample.pickRate * 100)}% of ${research.games} ${role} games (${Math.round(sample.winRate * 100)}% WR).`,
+      ],
+      ruleIds: [`research:slot:${sample.slot}`],
+      score: sample.pickRate,
+      evidence: researchEvidence(sample, research.games, research.wins),
+    })
+  }
+  return core
+}
+
+function researchBoots(
+  research: ResearchBuildSample,
+  itemsById: ReadonlyMap<number, Item>,
+  role: Role,
+): Recommendation[] {
+  const sample = research.boots
+  if (!sample || sample.games < 30) return []
+  const item = itemsById.get(sample.itemId)
+  if (!item) return []
+  return [
+    {
+      itemId: item.id,
+      name: item.name,
+      slot: 'boots',
+      source: 'research',
+      reasons: [
+        `Most-picked boots in ${research.games} ${role} games (${Math.round(sample.pickRate * 100)}% pick, ${Math.round(sample.winRate * 100)}% WR).`,
+      ],
+      ruleIds: ['research:boots'],
+      score: sample.pickRate,
+      evidence: researchEvidence(sample, research.games, research.wins),
+    },
+  ]
+}
+
 export function recommend(input: RecommendInput): RecommendResult {
   const enemyProfile = buildEnemyProfile(input.enemies, input.tags)
   const myDamage = damageClass(input.me, input.tags)
@@ -453,18 +562,28 @@ export function recommend(input: RecommendInput): RecommendResult {
   ]
   const pool = buildItemPool(input.items, excluded)
   const traitsOf = new Map<number, Trait[]>()
-  for (const item of [...pool.items, ...pool.boots]) traitsOf.set(item.id, itemTraits(item))
+  for (const item of [...pool.items, ...pool.boots]) {
+    traitsOf.set(item.id, itemTraits(item))
+  }
+  const evidenceOf = input.evidence?.items ?? new Map<number, ItemEvidence>()
 
-  const hasPrior = input.prior !== undefined && input.prior.games >= 3
-  const core = hasPrior
-    ? personalCore(pool.items, traitsOf, input, myDamage)
-    : classCore(pool.items, traitsOf, input, myDamage, profile)
+  const hasPrior = input.prior !== undefined && input.prior.games >= 5
+  const allItemsById = new Map<number, Item>(input.items.map((item) => [item.id, item]))
+  const sampleCore = input.research
+    ? researchCore(input.research, allItemsById, input.role)
+    : []
+  const core = sampleCore.length > 0
+    ? sampleCore
+    : hasPrior
+      ? personalCore(pool.items, traitsOf, input, myDamage)
+      : classCore(pool.items, traitsOf, evidenceOf, input, myDamage, profile)
   const coreNames = new Set(core.map((item) => item.name))
 
   const items = pickSituational(
     'item',
     pool.items,
     traitsOf,
+    evidenceOf,
     input,
     myDamage,
     archetype,
@@ -473,18 +592,24 @@ export function recommend(input: RecommendInput): RecommendResult {
     MAX_ITEMS,
     coreNames,
   )
-  const boots = pickSituational(
-    'boots',
-    pool.boots,
-    traitsOf,
-    input,
-    myDamage,
-    archetype,
-    profile,
-    enemyProfile,
-    MAX_BOOTS,
-    NO_NAMES,
-  )
+  const sampleBoots = input.research
+    ? researchBoots(input.research, allItemsById, input.role)
+    : []
+  const boots = sampleBoots.length > 0
+    ? sampleBoots
+    : pickSituational(
+        'boots',
+        pool.boots,
+        traitsOf,
+        evidenceOf,
+        input,
+        myDamage,
+        archetype,
+        profile,
+        enemyProfile,
+        MAX_BOOTS,
+        NO_NAMES,
+      )
 
   return {
     level: items.length > 0 || boots.length > 0 ? 'rules' : 'core',

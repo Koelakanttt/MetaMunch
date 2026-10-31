@@ -5,26 +5,40 @@ import type {
   GeneralStatsResponse,
   ItemStat,
 } from '@shared/general-stats'
+import { PERSONAL_QUEUES } from '@shared/personal'
 import { compareVersionsDesc } from '@shared/version'
 import { samplePatches, sampleRows } from '../db/general-stats-repo'
 import type { StaticDataSource } from './recommendation-service'
 
 /**
- * "General" statistics computed from the user's own synced matches.
- * It counts every participant of those matches, but stores no identifiers.
- * A replaceable external source can be added later behind a flag.
+ * Statistics for the tracked account. With `getAccount`, only that account's
+ * participant rows are counted; the optional provider is omitted by legacy tests.
  */
 export class GeneralStatsService {
   private readonly db: DatabaseSync
   private readonly source: StaticDataSource
+  private readonly getAccount: (() => { puuid: string } | null) | undefined
 
-  constructor(deps: { db: DatabaseSync; source: StaticDataSource }) {
+  constructor(deps: {
+    db: DatabaseSync
+    source: StaticDataSource
+    getAccount?: () => { puuid: string } | null
+  }) {
     this.db = deps.db
     this.source = deps.source
+    this.getAccount = deps.getAccount
   }
 
   run(filters: GeneralStatsFilters = {}): GeneralStatsResponse {
-    const rows = sampleRows(this.db, { patch: filters.patch, queue: filters.queue })
+    // With a tracked account, stats are the owner's games only. An empty puuid
+    // deliberately matches nothing when the account is not set.
+    const puuid = this.getAccount === undefined ? null : (this.getAccount()?.puuid ?? '')
+    const rows = sampleRows(
+      this.db,
+      { patch: filters.patch, queue: filters.queue },
+      PERSONAL_QUEUES,
+      puuid,
+    )
     const version = this.source.latestVersion()
     const champions = version === null ? [] : this.source.champions(version)
     const items = version === null ? [] : this.source.items(version)
@@ -79,7 +93,7 @@ export class GeneralStatsService {
 
     return {
       sample: { matches: matchIds.size, picks: totalPicks },
-      patches: samplePatches(this.db).sort(compareVersionsDesc),
+      patches: samplePatches(this.db, PERSONAL_QUEUES, puuid).sort(compareVersionsDesc),
       champions: championStats,
       items: itemStats,
       hasStaticData: version !== null,

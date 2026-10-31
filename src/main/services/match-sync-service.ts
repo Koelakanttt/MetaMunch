@@ -12,6 +12,7 @@ import {
 import { saveTimelineForMatch } from '../db/timeline-repo'
 import type { RiotApiProvider } from '../providers/riot-api'
 import { RiotApiError } from '../providers/riot-api'
+import { isRiotCircuitOpen } from '../providers/riot-request-manager'
 
 export interface SyncOptions {
   queues?: number[]
@@ -31,11 +32,18 @@ export interface MatchStatus {
   lastGameCreation: number | null
 }
 
-const DEFAULT_QUEUES = [420, 440, 400]
-const DEFAULT_MAX_NEW_MATCHES = 60
+const MAX_NEW_MATCHES = 500
+const MAX_CANDIDATE_IDS = 1000
+const ARAM_QUEUES = new Set([450, 2400])
 
 function numericSuffix(matchId: string): number {
   return Number(matchId.slice(matchId.lastIndexOf('_') + 1))
+}
+
+/** Summoner's Rift only; ARAM/Arena/TFT have different maps and would skew stats. */
+function supportedMatch(match: { mapId: number; queueId: number; remake: boolean }): boolean {
+  const isRift = match.mapId === 11 || match.queueId === 1441
+  return isRift && !ARAM_QUEUES.has(match.queueId) && !match.remake
 }
 
 export class MatchSyncService {
@@ -82,17 +90,38 @@ export class MatchSyncService {
     const account = getAccount(this.db)
     if (!account) throw new Error('No account set')
 
-    const queues = options.queues ?? DEFAULT_QUEUES
-    const maxNewMatches = options.maxNewMatches ?? DEFAULT_MAX_NEW_MATCHES
+    const queues = options.queues
+    const maxNewMatches = Math.max(1, options.maxNewMatches ?? MAX_NEW_MATCHES)
+    const maxCandidateIds = Math.min(
+      MAX_CANDIDATE_IDS,
+      Math.max(200, maxNewMatches * 2),
+    )
 
-    const collected: string[] = []
-    for (const queue of queues) {
-      const ids = await this.provider.getMatchIds(account.puuid, {
-        queue,
-        start: 0,
-        count: 100,
-      })
-      collected.push(...ids)
+    const collected = new Set<string>()
+    const collectPage = async (queue?: number): Promise<void> => {
+      let start = 0
+      while (collected.size < maxCandidateIds) {
+        const ids = await this.provider.getMatchIds(account.puuid, {
+          ...(queue === undefined ? {} : { queue }),
+          start,
+          count: 100,
+        })
+        const before = collected.size
+        for (const id of ids) collected.add(id)
+        if (ids.length < 100 || collected.size === before) break
+        start += 100
+      }
+    }
+
+    if (queues && queues.length > 0) {
+      for (const queue of queues) {
+        if (collected.size >= maxCandidateIds) break
+        await collectPage(queue)
+      }
+    } else {
+      // No queue filter: Swiftplay/Quickplay and new Rift queues (e.g. 1441)
+      // must not be skipped. The match details are filtered by map below.
+      await collectPage()
     }
 
     const ids = [...new Set(collected)].sort((a, b) => numericSuffix(b) - numericSuffix(a))
@@ -102,24 +131,33 @@ export class MatchSyncService {
 
     let saved = 0
     let failed = 0
+    let lastError: unknown = null
     for (const matchId of newIds) {
       try {
         const match = await this.provider.getMatch(matchId)
+        if (!supportedMatch(match)) {
+          continue
+        }
         saveMatch(this.db, match, [account.puuid])
         try {
           const timeline = await this.provider.getTimeline?.(matchId)
           if (timeline) saveTimelineForMatch(this.db, match, timeline, [account.puuid])
-        } catch {
+        } catch (error) {
+          if (isRiotCircuitOpen(error)) throw error
           // The match is still useful without optional timeline data.
         }
         saved += 1
       } catch (error) {
+        if (isRiotCircuitOpen(error)) throw error
         if (error instanceof RiotApiError && (error.status === 401 || error.status === 403)) {
           throw error
         }
+        lastError = error
         failed += 1
       }
     }
+
+    if (saved === 0 && failed > 0 && lastError) throw lastError
 
     return { requested: newIds.length, saved, skippedExisting, failed }
   }

@@ -6,6 +6,7 @@ import {
   saveTimelineEvents,
 } from '../db/timeline-repo'
 import type { RiotApiProvider } from '../providers/riot-api'
+import { isRiotCircuitOpen } from '../providers/riot-request-manager'
 import type { TrackedAccount } from './personal-stats-service'
 
 export interface TimelineBackfillDeps {
@@ -29,7 +30,7 @@ export class TimelineBackfillService {
   async run(limit = 10): Promise<TimelineBackfillResult> {
     const account = this.getAccount()
     if (!account) throw new Error('No account set')
-    const getTimeline = this.provider.getTimeline
+    const getTimeline = this.provider.getTimeline?.bind(this.provider)
     if (!getTimeline) throw new Error('Timeline API is not available')
 
     const ids = matchesWithoutTimelines(this.db, account.puuid, limit)
@@ -42,7 +43,8 @@ export class TimelineBackfillService {
         const participants = participantPuuidMap(this.db, matchId)
         saveTimelineEvents(this.db, matchId, events, participants, new Set([account.puuid]))
         saved += 1
-      } catch {
+      } catch (error) {
+        if (isRiotCircuitOpen(error)) throw error
         failed += 1
       }
     }

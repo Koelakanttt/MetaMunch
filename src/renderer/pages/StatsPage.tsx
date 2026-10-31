@@ -6,7 +6,11 @@ import { Card, EmptyState, Label, Select, StatusLine } from '../components/ui'
 const QUEUES: { value: number; label: string }[] = [
   { value: 400, label: 'Normal' },
   { value: 420, label: 'Ranked Solo' },
+  { value: 430, label: 'Normal Blind' },
   { value: 440, label: 'Ranked Flex' },
+  { value: 480, label: 'Swiftplay' },
+  { value: 490, label: 'Quickplay' },
+  { value: 1441, label: 'New Rift queue' },
 ]
 
 function errorMessage(reason: unknown): string {
@@ -105,8 +109,8 @@ export function StatsPage({ refreshKey }: { refreshKey: number }) {
         </StatusLine>
         {data.note ? <StatusLine tone="muted">{data.note}</StatusLine> : null}
         <StatusLine tone="muted">
-          Computed from your own synced matches (all participants, no player identifiers). External
-          statistics sources will be an optional later step.
+          Computed only from your tracked account&apos;s synced games. No player identifiers are
+          stored; other participants are not included.
         </StatusLine>
         {!data.hasStaticData ? (
           <StatusLine tone="muted">
@@ -118,7 +122,7 @@ export function StatsPage({ refreshKey }: { refreshKey: number }) {
 
       <Card title="Champions">
         {data.sample.picks === 0 ? (
-          <EmptyState>No synced matches yet. Sync your matches in Settings.</EmptyState>
+          <EmptyState>No data yet. Sync your matches in Settings.</EmptyState>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -143,7 +147,12 @@ export function StatsPage({ refreshKey }: { refreshKey: number }) {
                     <td className="py-2 pr-3 text-slate-300">{entry.picks}</td>
                     <td className="py-2 pr-3 text-slate-300">{percent(entry.pickRate)}</td>
                     <td className="py-2 pr-3 text-slate-300">{entry.wins}</td>
-                    <td className="py-2 text-slate-300">{percent(entry.winRate)}</td>
+                    <td className="py-2 text-slate-300">
+                      {percent(entry.winRate)}
+                      {entry.picks < 5 ? (
+                        <span className="ml-1 text-[11px] text-slate-500">low sample</span>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -177,7 +186,12 @@ export function StatsPage({ refreshKey }: { refreshKey: number }) {
                     </td>
                     <td className="py-2 pr-3 text-slate-300">{entry.purchases}</td>
                     <td className="py-2 pr-3 text-slate-300">{entry.wins}</td>
-                    <td className="py-2 text-slate-300">{percent(entry.winRate)}</td>
+                    <td className="py-2 text-slate-300">
+                      {percent(entry.winRate)}
+                      {entry.purchases < 5 ? (
+                        <span className="ml-1 text-[11px] text-slate-500">low sample</span>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
               </tbody>

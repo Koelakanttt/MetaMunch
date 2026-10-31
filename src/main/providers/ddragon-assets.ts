@@ -7,11 +7,13 @@ export interface Asset {
 export class DdragonAssetProvider {
   private readonly baseUrl: string
   private readonly userAgent: string
+  private readonly fetchFn: typeof fetch
   private readonly cache = new Map<string, Asset>()
 
-  constructor(options: { baseUrl?: string; userAgent?: string } = {}) {
+  constructor(options: { baseUrl?: string; userAgent?: string; fetchFn?: typeof fetch } = {}) {
     this.baseUrl = options.baseUrl ?? 'https://ddragon.leagueoflegends.com'
     this.userAgent = options.userAgent ?? 'MetaMunch (personal project)'
+    this.fetchFn = options.fetchFn ?? fetch
   }
 
   async get(
@@ -34,7 +36,7 @@ export class DdragonAssetProvider {
     if (cached) return cached
 
     try {
-      const response = await fetch(url, {
+      const response = await this.fetchFn(url, {
         headers: { 'User-Agent': this.userAgent },
         signal: AbortSignal.timeout(8000),
       })

@@ -3,7 +3,7 @@ import type { MatchupEntry, MatchupsResponse } from '@shared/matchups'
 import { matchupTotals } from '../db/matchup-repo'
 import type { StaticDataSource } from './recommendation-service'
 
-const MIN_GAMES = 3
+const MIN_GAMES = 5
 const MAX_LISTS = 5
 
 export interface MatchupDeps {

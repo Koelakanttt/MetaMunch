@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { DEFAULT_REGION, REGIONS, regionInfo, type RegionPlatform } from '@shared/region'
+import type { NetworkDiagnostics } from '@shared/diagnostics'
 import { THEMES, DEFAULT_THEME, type ThemeId } from '@shared/theme'
 import { Badge, Button, Card, Label, Select, StatusLine, TextInput } from '../components/ui'
 
@@ -63,6 +64,9 @@ export function SettingsPage({
   const [statsSourceMessage, setStatsSourceMessage] = useState('')
   const [savingTheme, setSavingTheme] = useState(false)
   const [themeMessage, setThemeMessage] = useState('')
+  const [emeraldPlus, setEmeraldPlus] = useState(false)
+  const [savingResearchSeed, setSavingResearchSeed] = useState(false)
+  const [researchSeedMessage, setResearchSeedMessage] = useState('')
 
   const [staticStatus, setStaticStatus] = useState<StaticStatus | null>(null)
   const [updating, setUpdating] = useState(false)
@@ -76,6 +80,9 @@ export function SettingsPage({
   const [timelineMessage, setTimelineMessage] = useState('')
 
   const [dbInfo, setDbInfo] = useState('')
+  const [network, setNetwork] = useState<NetworkDiagnostics | null>(null)
+  const [networkBusy, setNetworkBusy] = useState(false)
+  const [networkError, setNetworkError] = useState('')
 
   useEffect(() => {
     window.api
@@ -198,6 +205,18 @@ export function SettingsPage({
     }
   }
 
+  async function testNetwork(): Promise<void> {
+    setNetworkBusy(true)
+    setNetworkError('')
+    try {
+      setNetwork(await window.api.invoke('diagnostics:network', {}))
+    } catch (error) {
+      setNetworkError(errorMessage(error))
+    } finally {
+      setNetworkBusy(false)
+    }
+  }
+
   async function loadMatchStatus(): Promise<void> {
     setMatchStatus(await window.api.invoke('matches:status', {}))
   }
@@ -235,7 +254,9 @@ export function SettingsPage({
     setAccountMessage('syncing… (can take a few minutes)')
     try {
       const res = await window.api.invoke('matches:sync', {})
-      setAccountMessage(`saved ${res.saved}, skipped ${res.skippedExisting}, failed ${res.failed}`)
+      setAccountMessage(
+        `saved ${res.saved} new, ${res.skippedExisting} already stored, ${res.failed} failed`,
+      )
       await loadMatchStatus()
       onAccountChanged()
     } catch (error) {
@@ -365,6 +386,30 @@ export function SettingsPage({
     </Card>
   )
 
+  useEffect(() => {
+    window.api
+      .invoke('research:status', {})
+      .then((status) => setEmeraldPlus(status.emeraldPlus))
+      .catch(() => {
+        // Research options are optional on the settings page.
+      })
+  }, [])
+
+  async function toggleResearchSeed(): Promise<void> {
+    setSavingResearchSeed(true)
+    setResearchSeedMessage('')
+    try {
+      const next = await window.api.invoke('research:setOptions', {
+        emeraldPlus: !emeraldPlus,
+      })
+      setEmeraldPlus(next.emeraldPlus)
+    } catch (reason) {
+      setResearchSeedMessage(errorMessage(reason))
+    } finally {
+      setSavingResearchSeed(false)
+    }
+  }
+
   const statsSourceCard = (
     <Card title="Statistics source">
       <StatusLine>
@@ -388,6 +433,27 @@ export function SettingsPage({
       {statsSourceMessage ? (
         <StatusLine tone="error">{statsSourceMessage}</StatusLine>
       ) : null}
+    </Card>
+  )
+
+  const researchSeedCard = (
+    <Card title="Research crawl">
+      <label className="flex items-center gap-2 text-sm text-slate-300">
+        <input
+          type="checkbox"
+          checked={emeraldPlus}
+          onChange={() => {
+            void toggleResearchSeed()
+          }}
+          disabled={savingResearchSeed}
+        />
+        Emerald+ seed (adds Emerald I players)
+      </label>
+      <StatusLine tone="muted">
+        The research crawl uses Master+, Diamond and, when enabled, Emerald I ranked solo players.
+        Start and monitor it on the Research page.
+      </StatusLine>
+      {researchSeedMessage ? <StatusLine tone="error">{researchSeedMessage}</StatusLine> : null}
     </Card>
   )
 
@@ -452,6 +518,7 @@ export function SettingsPage({
         {regionCard}
         {leagueCard}
         {statsSourceCard}
+        {researchSeedCard}
         {themeCard}
         {legalCard}
         {onSkip ? (
@@ -479,6 +546,8 @@ export function SettingsPage({
       {leagueCard}
 
       {statsSourceCard}
+
+      {researchSeedCard}
 
       {themeCard}
 
@@ -529,8 +598,8 @@ export function SettingsPage({
           </StatusLine>
         ) : null}
         <StatusLine tone="muted">
-          Only Summoner&apos;s Rift queues (normal, ranked solo, ranked flex) are counted. ARAM and
-          remakes are ignored.
+          All Summoner&apos;s Rift queues are counted, including normal, ranked, Swiftplay and new
+          queue ids. ARAM, Arena and TFT are ignored, as are remakes.
         </StatusLine>
         {!settings?.hasRiotKey ? (
           <StatusLine tone="muted">
@@ -560,6 +629,45 @@ export function SettingsPage({
 
       <Card title="Diagnostics">
         <StatusLine tone="muted">{dbInfo || 'checking…'}</StatusLine>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => {
+              void testNetwork()
+            }}
+            disabled={networkBusy}
+          >
+            {networkBusy ? 'testing…' : 'Test connection'}
+          </Button>
+          {networkError ? <StatusLine tone="error">failed: {networkError}</StatusLine> : null}
+        </div>
+        {network ? (
+          <div className="space-y-2">
+            {network.checks.map((check) => (
+              <div key={check.id}>
+                <StatusLine tone={check.state === 'ok' ? 'success' : check.state === 'failed' ? 'error' : 'muted'}>
+                  {`${check.label}: ${check.state}${check.status ? ` · HTTP ${check.status}` : ''} · ${check.ms}ms`}
+                </StatusLine>
+                <StatusLine tone="muted">{check.message}</StatusLine>
+                {check.attempts.length > 0 ? (
+                  <StatusLine tone="muted">
+                    {check.attempts
+                      .map(
+                        (attempt) =>
+                          `${attempt.transport} ${attempt.status ?? attempt.error ?? 'no status'} ${attempt.ms}ms`,
+                      )
+                      .join(' · ')}
+                  </StatusLine>
+                ) : null}
+              </div>
+            ))}
+            {network.dns.map((entry) => (
+              <StatusLine key={entry.host} tone="muted">
+                {`${entry.host}: IPv4 ${entry.ipv4.length > 0 ? entry.ipv4.join(', ') : 'none'} · IPv6 ${entry.ipv6.length > 0 ? entry.ipv6.join(', ') : 'none'}${entry.error ? ` · ${entry.error}` : ''}`}
+              </StatusLine>
+            ))}
+          </div>
+        ) : null}
         <StatusLine tone="muted">
           All data stays on this computer in the app data folder. No telemetry, no analytics.
         </StatusLine>

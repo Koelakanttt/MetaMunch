@@ -1,6 +1,7 @@
 export const THEMES = [
   { id: 'pixel', label: 'Pixel Green' },
   { id: 'slate', label: 'Slate' },
+  { id: 'reforged', label: 'Reforged' },
 ] as const
 
 export type ThemeId = (typeof THEMES)[number]['id']

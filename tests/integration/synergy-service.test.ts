@@ -26,7 +26,7 @@ function source(version: string | null = '16.3.1'): StaticDataSource {
 
 function seed() {
   const db = memoryDb()
-  for (let i = 1; i <= 4; i += 1) {
+  for (let i = 1; i <= 5; i += 1) {
     insertMatch(db, {
       id: `EUW1_${i}`,
       queue: 420,
@@ -37,14 +37,14 @@ function seed() {
       ],
     })
   }
-  for (let i = 5; i <= 8; i += 1) {
+  for (let i = 6; i <= 10; i += 1) {
     insertMatch(db, {
       id: `EUW1_${i}`,
       queue: 420,
       creation: i,
       participants: [
-        { team: 100, champion: GAREN, win: i <= 5 },
-        { team: 100, champion: WUKONG, win: i <= 5 },
+        { team: 100, champion: GAREN, win: i <= 6 },
+        { team: 100, champion: WUKONG, win: i <= 6 },
       ],
     })
   }
@@ -59,9 +59,9 @@ describe('SynergyService', () => {
 
     expect(result.championName).toBe('Garen')
     expect(result.best.map((entry) => entry.championId)).toEqual(['Ahri'])
-    expect(result.best[0]?.winRate).toBe(0.75)
+    expect(result.best[0]?.winRate).toBe(0.6)
     expect(result.worst.map((entry) => entry.championId)).toEqual(['MonkeyKing'])
-    expect(result.worst[0]?.winRate).toBe(0.25)
+    expect(result.worst[0]?.winRate).toBe(0.2)
   })
 
   it('reports missing static data', () => {

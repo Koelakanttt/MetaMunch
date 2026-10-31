@@ -158,3 +158,114 @@ export function timelineMatchCount(
     .get(puuid, championKey, ...queues)
   return Number(row?.['matches'] ?? 0)
 }
+
+export interface PurchaseEventRow {
+  matchId: string
+  win: boolean
+  itemId: number
+  timestampMs: number
+}
+
+/** Purchase events for one champion, ordered for sequence reconstruction. */
+export function purchaseEventsForChampion(
+  db: DatabaseSync,
+  puuid: string,
+  championKey: number,
+  queues: readonly number[] = PERSONAL_QUEUES,
+): PurchaseEventRow[] {
+  const rows = db
+    .prepare(
+      `SELECT t.match_id, t.item_id, t.timestamp_ms, p.win
+       FROM timeline_events t
+       JOIN matches m ON m.match_id = t.match_id
+       JOIN participants p ON p.match_id = t.match_id AND p.puuid = t.puuid
+       WHERE t.puuid = ?
+         AND t.type = 'ITEM_PURCHASED'
+         AND t.item_id IS NOT NULL
+         AND p.champion_id = ?
+         AND m.remake = 0
+         AND m.queue_id IN (${placeholders(queues.length)})
+       ORDER BY t.match_id, t.timestamp_ms`,
+    )
+    .all(puuid, championKey, ...queues)
+  return rows.map((row) => ({
+    matchId: String(row['match_id']),
+    win: Number(row['win']) === 1,
+    itemId: Number(row['item_id']),
+    timestampMs: Number(row['timestamp_ms']),
+  }))
+}
+
+export interface SkillEventRow {
+  matchId: string
+  win: boolean
+  skillSlot: number
+  timestampMs: number
+}
+
+export interface MatchTimelineRow {
+  type: string
+  timestampMs: number
+  itemId: number | null
+  skillSlot: number | null
+  level: number | null
+}
+
+export function matchHasPlayer(db: DatabaseSync, matchId: string, puuid: string): boolean {
+  const row = db
+    .prepare('SELECT 1 AS present FROM participants WHERE match_id = ? AND puuid = ? LIMIT 1')
+    .get(matchId, puuid)
+  return row !== undefined
+}
+
+export function matchTimelineEvents(
+  db: DatabaseSync,
+  matchId: string,
+  puuid: string,
+): MatchTimelineRow[] {
+  const rows = db
+    .prepare(
+      `SELECT type, timestamp_ms, item_id, skill_slot, level
+       FROM timeline_events
+       WHERE match_id = ? AND puuid = ?
+       ORDER BY timestamp_ms`,
+    )
+    .all(matchId, puuid)
+  return rows.map((row) => ({
+    type: String(row['type']),
+    timestampMs: Number(row['timestamp_ms']),
+    itemId: row['item_id'] === null ? null : Number(row['item_id']),
+    skillSlot: row['skill_slot'] === null ? null : Number(row['skill_slot']),
+    level: row['level'] === null ? null : Number(row['level']),
+  }))
+}
+
+/** Skill level-up events for one champion, ordered for sequence reconstruction. */
+export function skillEventsForChampion(
+  db: DatabaseSync,
+  puuid: string,
+  championKey: number,
+  queues: readonly number[] = PERSONAL_QUEUES,
+): SkillEventRow[] {
+  const rows = db
+    .prepare(
+      `SELECT t.match_id, t.skill_slot, t.timestamp_ms, p.win
+       FROM timeline_events t
+       JOIN matches m ON m.match_id = t.match_id
+       JOIN participants p ON p.match_id = t.match_id AND p.puuid = t.puuid
+       WHERE t.puuid = ?
+         AND t.type = 'SKILL_LEVEL_UP'
+         AND t.skill_slot IS NOT NULL
+         AND p.champion_id = ?
+         AND m.remake = 0
+         AND m.queue_id IN (${placeholders(queues.length)})
+       ORDER BY t.match_id, t.timestamp_ms`,
+    )
+    .all(puuid, championKey, ...queues)
+  return rows.map((row) => ({
+    matchId: String(row['match_id']),
+    win: Number(row['win']) === 1,
+    skillSlot: Number(row['skill_slot']),
+    timestampMs: Number(row['timestamp_ms']),
+  }))
+}

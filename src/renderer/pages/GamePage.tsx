@@ -192,9 +192,9 @@ export function GamePage() {
           ) : null}
           {live.enemies.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
-              {live.enemies.map((enemy) => (
+              {live.enemies.map((enemy, index) => (
                 <ChampionIcon
-                  key={`${enemy.championKey}-${enemy.position}`}
+                  key={`${enemy.championId ?? enemy.name ?? 'enemy'}-${index}`}
                   championId={enemy.championId}
                   name={enemy.name}
                   size={26}
@@ -293,7 +293,7 @@ export function GamePage() {
           <EmptyState>No account set. Connect a Riot ID in Settings.</EmptyState>
         ) : null}
         {review?.state === 'no-matches' ? (
-          <EmptyState>No stored matches yet. Sync your matches in Settings.</EmptyState>
+          <EmptyState>No data yet. Sync matches in Settings.</EmptyState>
         ) : null}
       </Card>
 

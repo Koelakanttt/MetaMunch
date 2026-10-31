@@ -9,6 +9,7 @@ import {
 } from '@shared/recommend-api'
 import type { PersonalStats } from '@shared/personal'
 import type { ChampionTags, Rules } from '@shared/rules'
+import type { EvidenceProvider } from './research-evidence-provider'
 
 /** Read access to the stored static data of the latest patch. */
 export interface StaticDataSource {
@@ -27,6 +28,7 @@ export interface RecommendationServiceDeps {
   rules: Rules
   tags: ChampionTags
   personal?: PersonalStatsProvider
+  evidence?: EvidenceProvider
 }
 
 function view(r: Recommendation, items: ReadonlyMap<number, Item>): RecommendationView {
@@ -41,6 +43,7 @@ function view(r: Recommendation, items: ReadonlyMap<number, Item>): Recommendati
     gold: item?.goldTotal ?? 0,
     plaintext: item?.plaintext ?? '',
     stats: item?.stats ?? {},
+    evidence: r.evidence ?? null,
   }
 }
 
@@ -82,8 +85,29 @@ export class RecommendationService {
     const prior = personal
       ? { games: personal.games, build: personal.build.map((b) => ({ name: b.name, games: b.games })) }
       : undefined
+    const evidence = this.deps.evidence?.forChampion(
+      me,
+      request.role,
+      items,
+      enemies[0],
+    ) ?? null
 
-    const result = recommend({ me, role: request.role, enemies, items, tags, rules, prior })
+    const result = recommend({
+      me,
+      role: request.role,
+      enemies,
+      items,
+      tags,
+      rules,
+      prior,
+      ...(evidence ? { evidence } : {}),
+      ...(evidence?.research ? { research: evidence.research } : {}),
+    })
+
+    const missingResearch =
+      !evidence?.research || evidence.research.items.length === 0
+        ? `No research sample for ${me.name} ${request.role} yet: start the research crawl on the Research page.`
+        : null
 
     return {
       version,
@@ -99,6 +123,9 @@ export class RecommendationService {
       items: result.items.map((item) => view(item, itemsById)),
       boots: result.boots.map((item) => view(item, itemsById)),
       personal,
+      evidence: evidence?.scope ?? null,
+      laneEvidence: evidence?.lane ?? null,
+      researchNote: missingResearch,
     }
   }
 }

@@ -1,8 +1,8 @@
 import type { Item } from './ddragon'
 import { buildItemPool } from './item-traits'
 
-/** Queues used for personal statistics: normal draft, ranked solo, ranked flex. */
-export const PERSONAL_QUEUES: readonly number[] = [400, 420, 440]
+/** Summoner's Rift queues: normal, ranked, Swiftplay/Quickplay and newer Rift ids. ARAM is excluded. */
+export const PERSONAL_QUEUES: readonly number[] = [400, 420, 430, 440, 480, 490, 1441]
 /** Below this many games a number is shown with a "low sample" mark. */
 export const LOW_SAMPLE_GAMES = 5
 /** Weight of the account-average prior when smoothing a champion win rate. */

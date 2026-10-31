@@ -1,6 +1,11 @@
 import type { Match, RiotAccount } from '@shared/riot'
 import type { TimelineEvent } from '@shared/timeline'
-import type { MatchIdsQuery, RiotApiProvider } from './riot-api'
+import type {
+  LeagueEntriesQuery,
+  LeagueEntry,
+  MatchIdsQuery,
+  RiotApiProvider,
+} from './riot-api'
 
 /** Lets the running services switch to a provider built from a newly saved API key. */
 export class RiotApiProxy implements RiotApiProvider {
@@ -31,5 +36,12 @@ export class RiotApiProxy implements RiotApiProvider {
       return Promise.reject(new Error('Timeline API is not available with this Riot provider.'))
     }
     return this.current.getTimeline(matchId)
+  }
+
+  getLeagueEntries(query: LeagueEntriesQuery): Promise<LeagueEntry[]> {
+    if (!this.current.getLeagueEntries) {
+      return Promise.reject(new Error('League API is not available with this Riot provider.'))
+    }
+    return this.current.getLeagueEntries(query)
   }
 }

@@ -1,20 +1,29 @@
 import { useEffect, useRef, useState } from 'react'
 import type { MatchHistoryFilters, MatchHistoryResponse } from '@shared/history'
+import type { MatchTimelineResponse } from '@shared/match-timeline'
 import type { ChampionSummary } from '@shared/recommend-api'
 import { ROLES, type Role } from '@shared/rules'
 import { ChampionIcon, ItemIcon } from '../components/Icon'
-import { Card, EmptyState, Label, Select, StatusLine } from '../components/ui'
+import { Button, Card, EmptyState, Label, Select, StatusLine } from '../components/ui'
 
 const QUEUES: { value: number; label: string }[] = [
   { value: 400, label: 'Normal' },
   { value: 420, label: 'Ranked Solo' },
+  { value: 430, label: 'Normal Blind' },
   { value: 440, label: 'Ranked Flex' },
+  { value: 480, label: 'Swiftplay' },
+  { value: 490, label: 'Quickplay' },
+  { value: 1441, label: 'New Rift queue' },
 ]
 
 const QUEUE_NAMES: Record<number, string> = {
   400: 'Normal',
   420: 'Ranked Solo',
+  430: 'Normal Blind',
   440: 'Ranked Flex',
+  480: 'Swiftplay',
+  490: 'Quickplay',
+  1441: 'New Rift queue',
 }
 
 function errorMessage(reason: unknown): string {
@@ -42,6 +51,10 @@ export function MatchHistoryPage({
   const [queue, setQueue] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [timeline, setTimeline] = useState<MatchTimelineResponse | null>(null)
+  const [timelineLoading, setTimelineLoading] = useState(false)
+  const [timelineError, setTimelineError] = useState('')
+  const [selectedMatchId, setSelectedMatchId] = useState('')
   const requestIdRef = useRef(0)
 
   useEffect(() => {
@@ -79,6 +92,21 @@ export function MatchHistoryPage({
 
     void run()
   }, [refreshKey, championId, position, patch, queue])
+
+  async function showTimeline(matchId: string): Promise<void> {
+    setSelectedMatchId(matchId)
+    setTimeline(null)
+    setTimelineLoading(true)
+    setTimelineError('')
+    try {
+      setTimeline(await window.api.invoke('matches:timeline', { matchId }))
+    } catch (reason) {
+      setTimeline(null)
+      setTimelineError(errorMessage(reason))
+    } finally {
+      setTimelineLoading(false)
+    }
+  }
 
   if (error) {
     return (
@@ -172,7 +200,7 @@ export function MatchHistoryPage({
         {loading ? (
           <StatusLine tone="muted">loading…</StatusLine>
         ) : history.entries.length === 0 ? (
-          <EmptyState>No matches for these filters.</EmptyState>
+          <EmptyState>No data yet. Sync matches or adjust the filters.</EmptyState>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -185,7 +213,8 @@ export function MatchHistoryPage({
                   <th className="py-2 pr-3 font-medium">Queue</th>
                   <th className="py-2 pr-3 font-medium">Patch</th>
                   <th className="py-2 pr-3 font-medium">Duration</th>
-                  <th className="py-2 font-medium">Items</th>
+                  <th className="py-2 pr-3 font-medium">Items</th>
+                  <th className="py-2 font-medium">Timeline</th>
                 </tr>
               </thead>
               <tbody>
@@ -247,6 +276,17 @@ export function MatchHistoryPage({
                         '—'
                       )}
                     </td>
+                    <td className="py-2">
+                      <Button
+                        variant="ghost"
+                        className="px-2 py-1 text-[11px]"
+                        onClick={() => {
+                          void showTimeline(entry.matchId)
+                        }}
+                      >
+                        View
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -254,6 +294,61 @@ export function MatchHistoryPage({
           </div>
         )}
       </Card>
+
+      {selectedMatchId ? (
+        <Card title={`Match timeline · ${selectedMatchId}`}>
+          {timelineLoading ? <StatusLine tone="muted">loading…</StatusLine> : null}
+          {timelineError ? <StatusLine tone="error">error: {timelineError}</StatusLine> : null}
+          {!timelineLoading && !timelineError && timeline ? (
+            !timeline.hasTimeline ? (
+              <EmptyState>
+                No timeline stored for this match. Use &quot;Fetch timelines&quot; in Settings.
+              </EmptyState>
+            ) : (
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div>
+                  <p className="mb-1 text-[11px] uppercase tracking-wide text-slate-400">
+                    Purchases
+                  </p>
+                  <ol className="space-y-1 text-xs">
+                    {timeline.purchases.map((purchase, index) => (
+                      <li
+                        key={`${purchase.itemId}-${index}`}
+                        className="flex items-center gap-2"
+                      >
+                        <span className="w-10 text-slate-500">
+                          {formatDuration(purchase.seconds)}
+                        </span>
+                        <ItemIcon
+                          itemId={purchase.itemId}
+                          name={purchase.name}
+                          size={22}
+                        />
+                        <span className="text-slate-300">{purchase.name}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+                <div>
+                  <p className="mb-1 text-[11px] uppercase tracking-wide text-slate-400">
+                    Skill order
+                  </p>
+                  <div className="flex flex-wrap gap-1 text-xs">
+                    {timeline.skills.map((skill, index) => (
+                      <span
+                        key={`${skill.slot}-${skill.level}-${index}`}
+                        className="rounded border border-slate-700 px-1.5 py-0.5 text-slate-300"
+                      >
+                        {`${skill.slot}${skill.level}`}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )
+          ) : null}
+        </Card>
+      ) : null}
     </section>
   )
 }
