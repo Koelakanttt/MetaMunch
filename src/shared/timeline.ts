@@ -64,12 +64,19 @@ export interface PurchasePathEntry {
   winRate: number
 }
 
+export interface StartingItemBundle {
+  items: { itemId: number; name: string }[]
+  games: number
+  winRate: number
+}
+
 export interface PurchaseOrderResponse {
   championId: string
   championName: string | null
   sampleMatches: number
   items: PurchaseOrderItem[]
   paths: PurchasePathEntry[]
+  startingBundles: StartingItemBundle[]
   hasTimeline: boolean
 }
 
@@ -93,5 +100,8 @@ export interface SkillOrderResponse {
   sampleMatches: number
   orders: SkillOrderEntry[]
   hasTimeline: boolean
+  scope: 'matchup' | 'champion' | 'unavailable'
+  opponentName: string | null
+  note: string | null
 }
 

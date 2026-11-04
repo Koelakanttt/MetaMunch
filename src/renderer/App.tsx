@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { DEFAULT_REGION, regionInfo, type RegionPlatform } from '@shared/region'
 import type { RiotCircuitStatus } from '@shared/riot-status'
 import type { Role } from '@shared/rules'
 import { DEFAULT_THEME, type ThemeId } from '@shared/theme'
-import { Badge, Button } from './components/ui'
+import { Badge, Button, cx } from './components/ui'
+import { AboutPage, DisclaimerDialog } from './components/DisclaimerDialog'
 import { GamePage } from './pages/GamePage'
 import { MatchHistoryPage } from './pages/MatchHistoryPage'
 import { PatchChangesPage } from './pages/PatchChangesPage'
@@ -21,23 +23,55 @@ type Tab =
   | 'stats'
   | 'research'
   | 'patch'
+  | 'about'
   | 'settings'
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'recommend', label: 'Recommendations' },
-  { id: 'game', label: 'Game' },
-  { id: 'pool', label: 'My pool' },
-  { id: 'matches', label: 'Matches' },
-  { id: 'stats', label: 'Stats' },
-  { id: 'research', label: 'Research' },
-  { id: 'patch', label: 'Patch changes' },
-  { id: 'settings', label: 'Settings' },
+interface TabEntry {
+  id: Tab
+  label: string
+}
+
+const TAB_GROUPS: { label: string; items: TabEntry[] }[] = [
+  {
+    label: 'Play',
+    items: [
+      { id: 'recommend', label: 'Recommendations' },
+      { id: 'game', label: 'Game' },
+    ],
+  },
+  {
+    label: 'Your data',
+    items: [
+      { id: 'pool', label: 'My pool' },
+      { id: 'matches', label: 'Matches' },
+      { id: 'stats', label: 'Stats' },
+    ],
+  },
+  {
+    label: 'Research',
+    items: [
+      { id: 'research', label: 'Research' },
+      { id: 'patch', label: 'Patch changes' },
+    ],
+  },
+  {
+    label: 'App',
+    items: [
+      { id: 'about', label: 'About / Legal' },
+      { id: 'settings', label: 'Settings' },
+    ],
+  },
 ]
+
+const ALL_TABS: TabEntry[] = TAB_GROUPS.flatMap((group) => group.items)
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('recommend')
   const [refreshKey, setRefreshKey] = useState(0)
   const [hasKey, setHasKey] = useState<boolean | null>(null)
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
+  const [labsEnabled, setLabsEnabled] = useState(false)
+  const [disclaimerAcknowledged, setDisclaimerAcknowledged] = useState(true)
   const [setupSkipped, setSetupSkipped] = useState<boolean>(() => {
     try {
       return window.localStorage.getItem('metamunch.setupSkipped') === '1'
@@ -66,8 +100,14 @@ export default function App() {
         setHasKey(status.hasRiotKey)
         setRegion(status.region)
         setTheme(status.theme)
+        setLabsEnabled(status.labsEnabled)
+        setDisclaimerAcknowledged(status.disclaimerAcknowledged)
+        setSettingsLoaded(true)
       })
-      .catch(() => setHasKey(true))
+      .catch(() => {
+        setHasKey(true)
+        setSettingsLoaded(true)
+      })
   }, [])
 
   useEffect(() => {
@@ -118,7 +158,7 @@ export default function App() {
     setTab('recommend')
   }
 
-  if (hasKey === null) {
+  if (hasKey === null || !settingsLoaded) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-400">
         loading…
@@ -127,134 +167,177 @@ export default function App() {
   }
 
   const inSetup = !hasKey && !setupSkipped
+  const currentTab: Tab = tab === 'game' && !labsEnabled ? 'recommend' : tab
+  const currentEntry: TabEntry =
+    ALL_TABS.find((entry) => entry.id === currentTab) ?? {
+      id: 'recommend',
+      label: 'Recommendations',
+    }
+  const visibleGroups = TAB_GROUPS.map((group) => ({
+    label: group.label,
+    items: group.items.filter((entry) => entry.id !== 'game' || labsEnabled),
+  })).filter((group) => group.items.length > 0)
+
+  const navButton = (entry: TabEntry, mobile = false): ReactNode => (
+    <button
+      key={entry.id}
+      type="button"
+      onClick={() => setTab(entry.id)}
+      aria-current={currentTab === entry.id ? 'page' : undefined}
+      className={cx(
+        'rounded-md text-left transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-400',
+        mobile ? 'shrink-0 px-3 py-1.5 text-xs' : 'w-full px-3 py-1.5 text-sm',
+        currentTab === entry.id
+          ? 'bg-indigo-500/15 font-medium text-indigo-200 ring-1 ring-inset ring-indigo-500/40'
+          : 'text-slate-400 hover:bg-slate-800/70 hover:text-slate-200',
+      )}
+    >
+      {entry.label}
+    </button>
+  )
+
+  const statusChips = (
+    <>
+      <Badge>alpha</Badge>
+      {!hasKey ? <Badge tone="warning">static mode</Badge> : null}
+      {labsEnabled ? <Badge tone="accent">Labs</Badge> : null}
+    </>
+  )
 
   return (
-    <div className="mm-app min-h-screen bg-slate-950 text-slate-100">
-      <div className="mx-auto flex w-full max-w-[1500px]">
-        <aside className="hidden w-56 shrink-0 border-r border-slate-800 bg-slate-900/70 lg:flex lg:flex-col">
-          <div className="px-4 py-5">
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold tracking-tight">MetaMunch</h1>
-              <Badge>alpha</Badge>
+    <div className="mm-app flex h-screen overflow-hidden bg-slate-950 text-slate-100">
+      <aside className="hidden w-60 shrink-0 flex-col border-r border-slate-800 bg-slate-900/70 lg:flex">
+        <div className="shrink-0 px-4 py-4">
+          <div className="flex items-center gap-2">
+            <span className="text-lg font-semibold tracking-tight">MetaMunch</span>
+            <Badge>alpha</Badge>
+          </div>
+          <p className="mt-1 text-[11px] text-slate-500">
+            Read-only companion · {regionInfo(region).label}
+          </p>
+        </div>
+
+        {!inSetup ? (
+          <nav className="mm-slim-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-3">
+            {visibleGroups.map((group) => (
+              <div key={group.label} className="mb-3">
+                <div className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-600">
+                  {group.label}
+                </div>
+                <div className="space-y-0.5">{group.items.map((entry) => navButton(entry))}</div>
+              </div>
+            ))}
+          </nav>
+        ) : null}
+
+        <div className="shrink-0 space-y-1 border-t border-slate-800 px-4 py-3 text-[11px] text-slate-500">
+          <p>{hasKey ? 'Riot key stored locally' : 'No Riot key · static mode'}</p>
+          <p>{labsEnabled ? 'Labs features enabled' : 'Labs features off'}</p>
+        </div>
+      </aside>
+
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <header className="shrink-0 border-b border-slate-800 bg-slate-900/80">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5 lg:px-6">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="shrink-0 font-semibold tracking-tight text-slate-100 lg:hidden">
+                MetaMunch
+              </span>
+              <span className="hidden shrink-0 text-slate-600 lg:inline">/</span>
+              <span className="truncate text-sm font-semibold tracking-tight text-slate-100">
+                {inSetup ? 'Set up MetaMunch' : currentEntry.label}
+              </span>
+              <span className="hidden text-xs text-slate-500 sm:inline">
+                {regionInfo(region).label}
+              </span>
             </div>
-            {!hasKey ? <Badge>static mode</Badge> : null}
+            <div className="flex items-center gap-2">{statusChips}</div>
+            <Button
+              variant="ghost"
+              className="shrink-0 px-2 py-1 text-[11px]"
+              onClick={bump}
+              title="Reload this page's data"
+            >
+              Refresh
+            </Button>
           </div>
 
           {!inSetup ? (
-            <nav className="flex flex-col gap-1 px-2">
-              {TABS.map((entry) => (
-                <Button
-                  key={entry.id}
-                  variant={tab === entry.id ? 'primary' : 'ghost'}
-                  className="w-full justify-start text-left"
-                  onClick={() => setTab(entry.id)}
-                >
-                  {entry.label}
-                </Button>
-              ))}
+            <nav className="mm-slim-scroll flex gap-1 overflow-x-auto px-4 pb-2 lg:hidden">
+              {visibleGroups.flatMap((group) => group.items).map((entry) => navButton(entry, true))}
             </nav>
           ) : null}
+        </header>
 
-          <div className="mt-auto space-y-1 px-4 py-5 text-xs text-slate-500">
-            <p>Better decisions.</p>
-            <p>Stronger games.</p>
-          </div>
-        </aside>
-
-        <div className="min-w-0 flex-1">
-          <header className="border-b border-slate-800 bg-slate-900/80">
-            <div className="flex flex-wrap items-center gap-3 px-4 py-3 lg:px-6">
-              <h1 className="text-lg font-semibold tracking-tight lg:hidden">MetaMunch</h1>
-              <Badge>alpha</Badge>
-              {!hasKey ? <Badge>no key · static mode</Badge> : null}
-              <span className="ml-auto text-xs text-slate-500">
-                League of Legends companion · {regionInfo(region).label}
+        {riotStatus?.state === 'open' ? (
+          <div className="shrink-0 border-b border-amber-700/60 bg-amber-950/50 px-4 py-2.5 text-sm text-amber-200 lg:px-6">
+            <div className="flex flex-wrap items-center gap-3">
+              <strong>Riot API unreachable, background jobs paused.</strong>
+              <span className="text-amber-300/80">
+                Sync, timelines and research will not retry until you resume them.
               </span>
+              <Button
+                variant="secondary"
+                className="ml-auto shrink-0 px-3 py-1"
+                onClick={() => {
+                  void retryRiot()
+                }}
+              >
+                Retry
+              </Button>
             </div>
+          </div>
+        ) : null}
 
-            {!inSetup ? (
-              <nav className="flex gap-2 overflow-x-auto px-4 pb-3 lg:hidden">
-                {TABS.map((entry) => (
-                  <Button
-                    key={entry.id}
-                    variant={tab === entry.id ? 'primary' : 'secondary'}
-                    className="shrink-0"
-                    onClick={() => setTab(entry.id)}
-                  >
-                    {entry.label}
-                  </Button>
-                ))}
-              </nav>
-            ) : null}
-          </header>
-
-          {riotStatus?.state === 'open' ? (
-            <div className="border-b border-amber-700/60 bg-amber-950/50 px-4 py-3 text-sm text-amber-200 lg:px-6">
-              <div className="flex flex-wrap items-center gap-3">
-                <strong>Riot API unreachable, background jobs paused.</strong>
-                <span className="text-amber-300/80">
-                  Sync, timelines and research will not retry until you resume them.
-                </span>
-                <Button
-                  variant="secondary"
-                  className="ml-auto shrink-0"
-                  onClick={() => {
-                    void retryRiot()
-                  }}
-                >
-                  Retry
-                </Button>
-              </div>
-            </div>
-          ) : null}
-
-          <main className="px-4 py-5 lg:px-6">
-            {inSetup ? (
-              <SettingsPage
-                setup
-                onSkip={skipSetup}
-                onKeySaved={() => setHasKey(true)}
-                onDataUpdated={bump}
-                onAccountChanged={bump}
-                onRegionChanged={setRegion}
-                onThemeChanged={setTheme}
-              />
-            ) : (
-              <>
-                {tab === 'recommend' ? (
-                  <RecommendPage
-                    refreshKey={refreshKey}
-                    initialChampionId={focus?.championId ?? null}
-                    initialRole={focus?.role ?? 'TOP'}
-                  />
-                ) : null}
-                {tab === 'game' ? <GamePage /> : null}
-                {tab === 'pool' ? (
-                  <PoolPage refreshKey={refreshKey} onSelectChampion={openRecommendations} />
-                ) : null}
-                {tab === 'matches' ? (
-                  <MatchHistoryPage
-                    refreshKey={refreshKey}
-                    onSelectChampion={openRecommendations}
-                  />
-                ) : null}
-                {tab === 'stats' ? <StatsPage refreshKey={refreshKey} /> : null}
-                {tab === 'research' ? <ResearchPage /> : null}
-                {tab === 'patch' ? <PatchChangesPage /> : null}
-                {tab === 'settings' ? (
-                  <SettingsPage
-                    onKeySaved={() => setHasKey(true)}
-                    onDataUpdated={bump}
-                    onAccountChanged={bump}
-                    onRegionChanged={setRegion}
-                    onThemeChanged={setTheme}
-                  />
-                ) : null}
-              </>
-            )}
-          </main>
-        </div>
+        <main className="mm-slim-scroll min-h-0 flex-1 overflow-y-auto">
+          {inSetup ? (
+            <SettingsPage
+              setup
+              onSkip={skipSetup}
+              onKeySaved={() => setHasKey(true)}
+              onDataUpdated={bump}
+              onAccountChanged={bump}
+              onRegionChanged={setRegion}
+              onThemeChanged={setTheme}
+            />
+          ) : (
+            <>
+              {currentTab === 'recommend' ? (
+                <RecommendPage
+                  refreshKey={refreshKey}
+                  initialChampionId={focus?.championId ?? null}
+                  initialRole={focus?.role ?? 'TOP'}
+                  labsEnabled={labsEnabled}
+                />
+              ) : null}
+              {currentTab === 'game' && labsEnabled ? <GamePage /> : null}
+              {currentTab === 'pool' ? (
+                <PoolPage refreshKey={refreshKey} onSelectChampion={openRecommendations} />
+              ) : null}
+              {currentTab === 'matches' ? (
+                <MatchHistoryPage refreshKey={refreshKey} onSelectChampion={openRecommendations} />
+              ) : null}
+              {currentTab === 'stats' ? <StatsPage refreshKey={refreshKey} /> : null}
+              {currentTab === 'research' ? <ResearchPage labsEnabled={labsEnabled} /> : null}
+              {currentTab === 'patch' ? <PatchChangesPage /> : null}
+              {currentTab === 'about' ? <AboutPage /> : null}
+              {currentTab === 'settings' ? (
+                <SettingsPage
+                  onKeySaved={() => setHasKey(true)}
+                  onDataUpdated={bump}
+                  onAccountChanged={bump}
+                  onRegionChanged={setRegion}
+                  onThemeChanged={setTheme}
+                  onLabsChanged={setLabsEnabled}
+                />
+              ) : null}
+            </>
+          )}
+        </main>
       </div>
+      {!disclaimerAcknowledged ? (
+        <DisclaimerDialog onAcknowledged={() => setDisclaimerAcknowledged(true)} />
+      ) : null}
     </div>
   )
 }

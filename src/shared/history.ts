@@ -14,6 +14,7 @@ export interface MatchHistoryEntry {
   gameCreation: number
   durationSec: number
   items: MatchHistoryItem[]
+  reviewed: boolean
 }
 
 export interface MatchHistoryFilters {

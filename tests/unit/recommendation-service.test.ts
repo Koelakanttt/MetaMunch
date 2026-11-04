@@ -24,7 +24,8 @@ const items: Item[] = [
   mkItem(2, 'Mortal Reminder', { tags: ['Damage', 'ArmorPenetration'], description: stats([35, 'Attack Damage']) + 'applies 40% Wounds', goldTotal: 3000 }),
   mkItem(3, 'Force of Nature', { tags: ['SpellBlock'], description: stats([70, 'Magic Resist']), goldTotal: 2800 }),
   mkItem(4, 'Black Cleaver', { tags: ['Damage', 'Health'], description: stats([40, 'Attack Damage'], [400, 'Health'], [20, 'Ability Haste']), goldTotal: 3000 }),
-  mkItem(5, 'Chainlaced Crushers', { tags: ['Boots', 'SpellBlock'], description: stats([25, 'Magic Resist']), goldTotal: 1250 }),
+  // Normal shop boots: quest tier-3 boots are mid-lane only and must stay out of a TOP result.
+  mkItem(5, "Mercury's Treads", { tags: ['Boots', 'SpellBlock'], description: stats([25, 'Magic Resist']), goldTotal: 1250 }),
 ]
 
 function service(version: string | null = '16.21.1', personal?: PersonalStatsProvider) {
@@ -72,7 +73,7 @@ describe('RecommendationService.run', () => {
     expect(r.items[0]?.source).toBe('rules')
     expect(r.core.map((i) => i.name)).toEqual(['Black Cleaver'])
     expect(r.core[0]?.source).toBe('core')
-    expect(r.boots.map((b) => b.name)).toEqual(['Chainlaced Crushers'])
+    expect(r.boots.map((b) => b.name)).toEqual(["Mercury's Treads"])
   })
   it('uses display data of the right champion for ids that differ from names', () => {
     const r = service().run({ meId: 'MonkeyKing', role: 'TOP', enemyIds: [] })
@@ -141,6 +142,11 @@ describe('RecommendationService.run', () => {
             samplePatch: '16.21',
             region: 'EUW1',
             rankScope: 'MASTER+',
+            tierScope: 'Diamond+ (Diamond, Master, Grandmaster, Challenger)',
+            roleScope: 'Riot-assigned roles only',
+            filters: { tier: 'diamond', includeInferred: false, includeUnknownTier: false },
+            excludedInferred: 0,
+            excludedUnknownTier: 0,
             championGames: 100,
             fallback: false,
           },
@@ -167,9 +173,10 @@ describe('RecommendationService.run', () => {
     expect(r.researchNote).toBeNull()
     expect(r.core.map((item) => item.name)).toEqual(['Black Cleaver'])
     expect(r.core[0]?.source).toBe('research')
-    expect(r.boots.map((item) => item.name)).toEqual(['Chainlaced Crushers'])
+    expect(r.boots.map((item) => item.name)).toEqual(["Mercury's Treads"])
     expect(r.boots[0]?.source).toBe('research')
     expect(r.core[0]?.evidence?.games).toBe(90)
+    expect(r.research?.games).toBe(100)
   })
 
   it('names the missing research champion and role', () => {

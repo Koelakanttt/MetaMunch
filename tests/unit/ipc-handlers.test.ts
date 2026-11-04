@@ -12,7 +12,9 @@ import { RiotRequestManager } from '../../src/main/providers/riot-request-manage
 import { ChampionSelectService } from '../../src/main/services/champion-select-service'
 import { GeneralStatsService } from '../../src/main/services/general-stats-service'
 import { LiveGameService } from '../../src/main/services/live-game-service'
+import { LpService } from '../../src/main/services/lp-service'
 import { MatchHistoryService } from '../../src/main/services/match-history-service'
+import { MatchReviewService } from '../../src/main/services/match-review-service'
 import { MatchSyncService } from '../../src/main/services/match-sync-service'
 import { MatchTimelineService } from '../../src/main/services/match-timeline-service'
 import { MatchupService } from '../../src/main/services/matchup-service'
@@ -22,6 +24,7 @@ import { PostGameService } from '../../src/main/services/post-game-service'
 import { PurchaseOrderService } from '../../src/main/services/purchase-order-service'
 import { RecommendationService } from '../../src/main/services/recommendation-service'
 import { ResearchService } from '../../src/main/services/research-service'
+import { ResearchBuildService } from '../../src/main/services/research-build-service'
 import { RuneService } from '../../src/main/services/rune-service'
 import { SkillOrderService } from '../../src/main/services/skill-order-service'
 import type { StaticDataSource } from '../../src/main/services/recommendation-service'
@@ -34,6 +37,7 @@ import { StatsCoordinator } from '../../src/main/services/stats-coordinator'
 import { StaticDataService } from '../../src/main/services/static-data-service'
 import { SynergyService } from '../../src/main/services/synergy-service'
 import { TimelineBackfillService } from '../../src/main/services/timeline-backfill-service'
+import { TimelineSummaryService } from '../../src/main/services/timeline-summary-service'
 
 const dataDragonProvider: DataDragonProvider = {
   getLatestVersion: async () => '16.3.1',
@@ -119,6 +123,23 @@ const matchTimeline = new MatchTimelineService({
   source: fakeSource,
   getAccount: () => null,
 })
+const timelineSummary = new TimelineSummaryService({
+  db,
+  source: fakeSource,
+  provider: () => riotProvider,
+  getAccount: () => null,
+})
+const matchReview = new MatchReviewService({
+  db,
+  source: fakeSource,
+  timelineSummary,
+  getAccount: () => null,
+})
+const lp = new LpService({
+  db,
+  provider: () => riotProvider,
+  getAccount: () => null,
+})
 const research = new ResearchService({
   db,
   provider: riotProvider,
@@ -126,6 +147,7 @@ const research = new ResearchService({
   getPatch: () => null,
   getRegion: () => 'EUW1',
 })
+const researchBuild = new ResearchBuildService({ db, source: fakeSource })
 const diagnostics = new NetworkDiagnosticsProvider({
   fetchFn: async () => new Response('{}'),
 })
@@ -140,15 +162,19 @@ const timelineBackfill = new TimelineBackfillService({
 const handlers = createHandlers({
   db,
   appVersion: '0.1.0-alpha',
+  dataPath: process.cwd(),
+  backupDir: process.cwd(),
   staticData,
   matchSync,
   matchHistory,
   recommendation,
+  researchBuild,
   patchChanges,
   pool,
   generalStats,
   championSelect,
   liveGame,
+  lp,
   postGame,
   matchups,
   synergies,
@@ -156,8 +182,10 @@ const handlers = createHandlers({
   purchaseOrder,
   skillOrder,
   matchTimeline,
+  matchReview,
   research,
   timelineBackfill,
+  timelineSummary,
   settings,
   diagnostics,
   riot,
@@ -174,7 +202,7 @@ describe('ipc handlers', () => {
   it('reports db info', async () => {
     const res = await handlers['db:info']({})
 
-    expect(res.schemaVersion).toBe(10)
+    expect(res.schemaVersion).toBe(15)
     expect(res.sqliteVersion).toMatch(/^3\./)
     expect(res.appVersion).toBe('0.1.0-alpha')
   })
@@ -233,6 +261,10 @@ describe('ipc handlers', () => {
       leaguePath: null,
       externalStatsEnabled: false,
       theme: 'pixel',
+      labsEnabled: false,
+      disclaimerAcknowledged: false,
+      researchFilters: { tier: 'diamond', includeInferred: false, includeUnknownTier: false },
+      researchTimelineMode: 'quarter',
     })
   })
 
@@ -246,6 +278,10 @@ describe('ipc handlers', () => {
       leaguePath: null,
       externalStatsEnabled: false,
       theme: 'pixel',
+      labsEnabled: false,
+      disclaimerAcknowledged: false,
+      researchFilters: { tier: 'diamond', includeInferred: false, includeUnknownTier: false },
+      researchTimelineMode: 'quarter',
     })
     const stored = getSetting(db, RIOT_KEY_SETTING)
     expect(stored?.startsWith('enc:')).toBe(true)
@@ -278,6 +314,33 @@ describe('ipc handlers', () => {
     expect(handlers['settings:setTheme']({ theme: 'slate' })).toEqual({ ok: true })
     expect((await handlers['settings:get']({})).theme).toBe('slate')
     expect(() => handlers['settings:setTheme']({ theme: 'neon' })).toThrow('Unknown theme')
+  })
+
+  it('stores Labs and disclaimer acknowledgement', async () => {
+    expect(handlers['settings:setLabs']({ enabled: true })).toEqual({ ok: true })
+    expect((await handlers['settings:get']({})).labsEnabled).toBe(true)
+    expect(handlers['settings:ackDisclaimer']({})).toEqual({ ok: true })
+    expect((await handlers['settings:get']({})).disclaimerAcknowledged).toBe(true)
+  })
+
+  it('stores the research filters and timeline mode', async () => {
+    expect(
+      handlers['settings:setResearchFilters']({
+        tier: 'emerald',
+        includeInferred: true,
+        includeUnknownTier: false,
+      }),
+    ).toEqual({ ok: true })
+    expect((await handlers['settings:get']({})).researchFilters).toEqual({
+      tier: 'emerald',
+      includeInferred: true,
+      includeUnknownTier: false,
+    })
+    expect(handlers['settings:setResearchTimelineMode']({ mode: 'full' })).toEqual({ ok: true })
+    expect((await handlers['settings:get']({})).researchTimelineMode).toBe('full')
+    expect(() => handlers['settings:setResearchTimelineMode']({ mode: 'half' })).toThrow(
+      'Unknown timeline',
+    )
   })
 
   it('reports no League client when the lockfile is absent', async () => {
@@ -361,6 +424,10 @@ describe('ipc handlers', () => {
       champions: [],
       items: [],
     })
+  })
+
+  it('returns no research build without static data', () => {
+    expect(handlers['research:build']({ championId: 'Garen', role: 'TOP' })).toBeNull()
   })
 
   it('rejects timeline backfill without an account', async () => {

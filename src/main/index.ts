@@ -3,9 +3,10 @@ import { setDefaultResultOrder } from 'node:dns'
 import { app, BrowserWindow, dialog, net, protocol, safeStorage } from 'electron'
 import { regionInfo } from '@shared/region'
 import { loadChampionTags, loadRules } from './data/rules-data'
+import { backupDatabase } from './db/backup'
 import { getAccount } from './db/matches-repo'
 import { migrations } from './db/migrations'
-import { runMigrations } from './db/migrate'
+import { getSchemaVersion, runMigrations } from './db/migrate'
 import { openDb } from './db/open'
 import { createDbSource } from './db/static-data-source'
 import { getLatestPatch } from './db/static-data-repo'
@@ -18,15 +19,19 @@ import { HttpRiotApiProvider } from './providers/http-riot-api'
 import { MissingKeyRiotApiProvider } from './providers/missing-key-riot-api'
 import { NetworkDiagnosticsProvider } from './providers/network-diagnostics'
 import { networkFetch } from './providers/network-fetch'
+import { RateLimiter } from './providers/rate-limiter'
 import { riotFetch } from './providers/riot-fetch'
 import type { RiotApiProvider } from './providers/riot-api'
 import { RiotApiProxy } from './providers/riot-api-proxy'
 import { RiotRequestManager } from './providers/riot-request-manager'
 import { HttpRuneDataProvider } from './providers/rune-data'
 import { ChampionSelectService } from './services/champion-select-service'
+import { GameSessionWatcher } from './services/game-session-watcher'
 import { GeneralStatsService } from './services/general-stats-service'
 import { LiveGameService } from './services/live-game-service'
+import { LpService } from './services/lp-service'
 import { MatchHistoryService } from './services/match-history-service'
+import { MatchReviewService } from './services/match-review-service'
 import { MatchSyncService } from './services/match-sync-service'
 import { MatchTimelineService } from './services/match-timeline-service'
 import { MatchupService } from './services/matchup-service'
@@ -38,6 +43,7 @@ import { PurchaseOrderService } from './services/purchase-order-service'
 import { RecommendationService } from './services/recommendation-service'
 import { ResearchEvidenceProvider } from './services/research-evidence-provider'
 import { ResearchService } from './services/research-service'
+import { ResearchBuildService } from './services/research-build-service'
 import { RuneService } from './services/rune-service'
 import type { SettingsCrypto } from './services/settings-service'
 import { SettingsService } from './services/settings-service'
@@ -46,6 +52,7 @@ import { StatsCoordinator } from './services/stats-coordinator'
 import { StaticDataService } from './services/static-data-service'
 import { SynergyService } from './services/synergy-service'
 import { TimelineBackfillService } from './services/timeline-backfill-service'
+import { TimelineSummaryService } from './services/timeline-summary-service'
 
 loadEnv(app.getAppPath())
 setDefaultResultOrder('ipv4first')
@@ -80,6 +87,10 @@ const chromiumFetch: typeof fetch = (input, init) =>
 const riotManager = new RiotRequestManager({
   fetchFn: riotFetch,
   fallbackFetchFn: chromiumFetch,
+  limiter: new RateLimiter([
+    { limit: 20, windowMs: 1000 },
+    { limit: 60, windowMs: 120000 },
+  ]),
   logger: (event) => console.info(JSON.stringify(event)),
 })
 
@@ -133,6 +144,15 @@ function notifyStaticDataUpdated(): void {
 
 void app.whenReady().then(() => {
   const db = openDb(join(app.getPath('userData'), 'metamunch.db'))
+  const backupDir = join(app.getPath('userData'), 'backups')
+  const schemaVersion = getSchemaVersion(db)
+  if (schemaVersion > 0 && schemaVersion < 15) {
+    try {
+      backupDatabase(db, backupDir)
+    } catch (error) {
+      console.error('Pre-migration backup failed', error)
+    }
+  }
   runMigrations(db, migrations)
 
   const assets = new DdragonAssetProvider({ fetchFn: networkFetch })
@@ -205,7 +225,30 @@ void app.whenReady().then(() => {
       : null
   }
   const personal = new PersonalStatsService({ db, getAccount: getTrackedAccount })
+  const lp = new LpService({ db, provider: () => riotProxy, getAccount: getTrackedAccount })
   const source = createDbSource(db)
+  const timelineSummary = new TimelineSummaryService({
+    db,
+    source,
+    provider: () => riotProxy,
+    getAccount: getTrackedAccount,
+  })
+  const matchReview = new MatchReviewService({
+    db,
+    source,
+    timelineSummary,
+    getAccount: getTrackedAccount,
+  })
+  const gameSessionWatcher = new GameSessionWatcher({
+    db,
+    getAccount: getTrackedAccount,
+    isEnabled: () => settings.labsEnabled(),
+    sync: async () => {
+      await matchSync.sync({ maxNewMatches: 3 })
+      await timelineSummary.ensureRecent(5)
+    },
+  })
+  gameSessionWatcher.start()
   const evidence = new ResearchEvidenceProvider({ db, source })
   const recommendation = new RecommendationService({
     source,
@@ -228,7 +271,9 @@ void app.whenReady().then(() => {
     source,
     getPatch: () => staticData.status()?.version ?? null,
     getRegion: () => settings.region(),
+    getTimelineMode: () => settings.researchTimelineMode(),
   })
+  const researchBuild = new ResearchBuildService({ db, source })
   const generalStats = new StatsCoordinator({
     own: new GeneralStatsService({ db, source, getAccount: getTrackedAccount }),
     isExternalEnabled: () => settings.externalStatsEnabled(),
@@ -268,17 +313,22 @@ void app.whenReady().then(() => {
     createHandlers({
       db,
       appVersion: app.getVersion(),
+      dataPath: app.getPath('userData'),
+      backupDir,
       staticData,
       matchSync,
       matchHistory,
       matchTimeline,
+      matchReview,
       research,
+      researchBuild,
       recommendation,
       patchChanges,
       pool,
       generalStats,
       championSelect,
       liveGame,
+      lp,
       postGame,
       matchups,
       synergies,
@@ -286,6 +336,7 @@ void app.whenReady().then(() => {
       purchaseOrder,
       skillOrder,
       timelineBackfill,
+      timelineSummary,
       settings,
       diagnostics,
       riot: riotManager,
@@ -298,8 +349,15 @@ void app.whenReady().then(() => {
     .refresh()
     .then(() => notifyStaticDataUpdated())
     .catch(() => {})
+  void lp.snapshot()
+  void timelineSummary.ensureRecent()
+  const lpTimer = setInterval(() => {
+    void lp.snapshot()
+  }, 60 * 60 * 1000)
 
   app.on('will-quit', () => {
+    clearInterval(lpTimer)
+    gameSessionWatcher.stop()
     db.close()
   })
 

@@ -147,14 +147,18 @@ unsigned, so Windows SmartScreen may warn; auto-update is not enabled yet.
   lookups and match syncs; Data Dragon static data is global. After switching servers, set your
   Riot ID again. Static data comes from Data Dragon; matches come from the official Riot API.
 - Alpha does not include external statistics sites, client integration or in-game overlays.
-  Global/pro-build statistics, rank filters and ban rates need external aggregate sources; they are
+  Aggregate/pro-build statistics, rank filters and ban rates need external aggregate sources; they are
   not implemented. Skill order and purchase timing are available only for matches with stored
-  timeline data.
+  timeline data. The built-in research sample is not global: it covers Master+/Diamond and optional
+  Emerald I ranked-solo players.
 - Recommendations are heuristic. They use public champion tags and your own match history; check
   them in the client before buying.
 - No telemetry, no analytics, no accounts, no monetization.
 - All data stays on your computer. Only your own puuid is stored; other participants are stored
-  without identifiers.
+  without identifiers. Other players' puuids exist only in the temporary crawl frontier and are
+  deleted after processing.
+- Labs features (Game page, champion select, research crawl controls and experimental item-value
+  math) are off by default on a fresh install; enable them in Settings.
 
 ## Principles
 

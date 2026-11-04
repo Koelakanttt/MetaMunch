@@ -85,10 +85,14 @@ export interface PopularRunePage {
   lowSample: boolean
 }
 
+export type RuneSource = 'global' | 'personal' | 'combined'
+
 export interface RunesResponse {
   version: string | null
   championId: string
   championName: string | null
+  source: RuneSource
+  opponentName: string | null
   pages: PopularRunePage[]
   researchPages: PopularRunePage[]
   researchScope: ResearchRuneScope | null

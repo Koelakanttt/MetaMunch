@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { PoolEntry, PoolResponse } from '@shared/pool'
 import { ChampionIcon } from '../components/Icon'
-import { Card, EmptyState, StatusLine } from '../components/ui'
+import { Card, EmptyState, PageHeader, PageLayout, StatusLine } from '../components/ui'
 
 function errorMessage(reason: unknown): string {
   const message = reason instanceof Error ? reason.message : String(reason)
@@ -37,30 +37,41 @@ export function PoolPage({
 
   if (error) {
     return (
-      <Card title="My pool">
-        <StatusLine tone="error">error: {error}</StatusLine>
-      </Card>
+      <PageLayout>
+        <Card title="My pool">
+          <StatusLine tone="error">error: {error}</StatusLine>
+        </Card>
+      </PageLayout>
     )
   }
 
   if (!data) {
     return (
-      <Card title="My pool">
-        <StatusLine tone="muted">loading…</StatusLine>
-      </Card>
+      <PageLayout>
+        <Card title="My pool">
+          <StatusLine tone="muted">loading…</StatusLine>
+        </Card>
+      </PageLayout>
     )
   }
 
   if (!data.account) {
     return (
-      <Card title="My pool">
-        <EmptyState>No account set. Connect a Riot ID in Settings.</EmptyState>
-      </Card>
+      <PageLayout>
+        <PageHeader title="My pool" subtitle="Per-champion record from your tracked matches." />
+        <Card>
+          <EmptyState>No account set. Connect a Riot ID in Settings.</EmptyState>
+        </Card>
+      </PageLayout>
     )
   }
 
   return (
-    <section className="space-y-4">
+    <PageLayout>
+      <PageHeader
+        title="My pool"
+        subtitle="Per-champion record from your tracked matches. Raw win rates only; small samples are marked."
+      />
       <Card title="Account">
         <p className="font-medium">
           {data.account.gameName}#{data.account.tagLine}
@@ -135,6 +146,6 @@ export function PoolPage({
           </div>
         )}
       </Card>
-    </section>
+    </PageLayout>
   )
 }

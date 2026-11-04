@@ -1,14 +1,36 @@
 import type { DatabaseSync } from 'node:sqlite'
+import { isPurchasableOnSR } from '@shared/item-traits'
 import type { Match } from '@shared/riot'
 import { toPatch } from '@shared/riot'
+import type { TimelineEvent } from '@shared/timeline'
 import type {
   ResearchChampionStat,
   ResearchCollectResult,
   ResearchCoverageRow,
+  ResearchAudit,
+  ResearchFilters,
   ResearchItemStat,
   ResearchStatus,
   ResearchSummary,
 } from '@shared/research'
+import {
+  DEFAULT_RESEARCH_TIMELINE_MODE,
+  parseResearchFilters,
+  roleScopeLabel,
+  shouldCollectTimeline,
+  tierScopeLabel,
+  type ResearchTimelineMode,
+} from '@shared/research'
+import {
+  compactTimeline,
+  parseResearchTimeline,
+  type CompactedTimeline,
+  type ResearchTimelineEventLike,
+} from '@shared/research-timeline'
+import {
+  researchTimelineCount,
+  saveResearchTimelines,
+} from '../db/research-timeline-repo'
 import {
   addFrontierPlayer,
   clearFrontier,
@@ -22,10 +44,8 @@ import {
   pruneResearchSnapshots,
   recordPatchFirstSeen,
   removeFrontierPlayer,
-  researchChampionRows,
+  rescheduleFrontierPlayer,
   researchCounts,
-  researchCoverageRows,
-  researchItemRows,
   researchSnapshotForPatch,
   researchStatus,
   resetProcessingFrontier,
@@ -34,6 +54,14 @@ import {
   updateResearchSnapshotScope,
   updateResearchSnapshotTarget,
 } from '../db/research-repo'
+import {
+  championRoleTotals,
+  researchAuditRows,
+  researchChampionRowsFiltered,
+  researchCoverageRowsFiltered,
+  researchFilterCounts,
+  researchItemRowsFiltered,
+} from '../db/research-aggregate-repo'
 import type { ApexTier, LeagueEntry, RiotApiProvider } from '../providers/riot-api'
 import { RiotApiError } from '../providers/riot-api'
 import { isRiotCircuitOpen } from '../providers/riot-request-manager'
@@ -43,6 +71,7 @@ const QUEUE = 420
 const DEFAULT_TARGET = 5000
 const DEFAULT_DAILY_CAP = 20000
 const MAX_SEEDS = 2500
+const ROUND_MATCHES = 3
 const SEED_PAGE_LIMIT = 4
 const APEX_TIERS: readonly ApexTier[] = ['CHALLENGER', 'GRANDMASTER', 'MASTER']
 const DIAMOND_DIVISIONS = ['I', 'II', 'III', 'IV'] as const
@@ -53,6 +82,9 @@ export interface ResearchStartOptions {
   targetMatches?: number
   dailyRequestCap?: number
   emeraldPlus?: boolean
+  focusChampionId?: string | null
+  focusRole?: string | null
+  focusTarget?: number
 }
 
 export interface ResearchDeps {
@@ -62,6 +94,8 @@ export interface ResearchDeps {
   getPatch: () => string | null
   getRegion: () => string
   now?: () => number
+  /** Timeline collection setting; defaults to 25% of kept matches. */
+  getTimelineMode?: () => ResearchTimelineMode
 }
 
 class ResearchHalt extends Error {
@@ -76,6 +110,8 @@ interface RunCounters {
   skipped: number
   failed: number
   seedPlayers: number
+  timelines: number
+  timelineFailures: number
 }
 
 function clampTarget(value: number | undefined, fallback: number): number {
@@ -86,6 +122,11 @@ function clampTarget(value: number | undefined, fallback: number): number {
 function clampCap(value: number | undefined, fallback: number): number {
   const cap = value === undefined ? fallback : Math.floor(value)
   return Math.max(100, Math.min(1000000, Number.isFinite(cap) ? cap : fallback))
+}
+
+function clampFocusTarget(value: number | undefined, fallback: number): number {
+  const target = value === undefined ? fallback : Math.floor(value)
+  return Math.max(1, Math.min(10000, Number.isFinite(target) ? target : fallback))
 }
 
 function dayKey(now: number): string {
@@ -105,11 +146,19 @@ export class ResearchService {
   private readonly source: StaticDataSource
   private readonly getPatch: () => string | null
   private readonly getRegion: () => string
+  private readonly getTimelineMode: () => ResearchTimelineMode
   private readonly now: () => number
   private readonly summonerCache = new Map<string, string>()
   private requestTimes: number[] = []
   private loopPromise: Promise<void> | null = null
-  private counters: RunCounters = { saved: 0, skipped: 0, failed: 0, seedPlayers: 0 }
+  private counters: RunCounters = {
+    saved: 0,
+    skipped: 0,
+    failed: 0,
+    seedPlayers: 0,
+    timelines: 0,
+    timelineFailures: 0,
+  }
 
   constructor(deps: ResearchDeps) {
     this.db = deps.db
@@ -117,6 +166,7 @@ export class ResearchService {
     this.source = deps.source
     this.getPatch = deps.getPatch
     this.getRegion = deps.getRegion
+    this.getTimelineMode = deps.getTimelineMode ?? (() => DEFAULT_RESEARCH_TIMELINE_MODE)
     this.now = deps.now ?? Date.now
     resetProcessingFrontier(this.db)
     const crawl = getResearchCrawl(this.db)
@@ -129,13 +179,14 @@ export class ResearchService {
     }
   }
 
-  status(): ResearchStatus {
+  status(filtersInput?: unknown): ResearchStatus {
+    const filters = parseResearchFilters(filtersInput)
     const status = researchStatus(this.db)
     const version = this.source.latestVersion()
     const champions = version === null ? [] : this.source.champions(version)
     const byKey = new Map(champions.map((champion) => [champion.key, champion]))
     const snapshot = status.snapshot
-    const rows = snapshot ? researchCoverageRows(this.db, snapshot.id) : []
+    const rows = snapshot ? researchCoverageRowsFiltered(this.db, snapshot.id, filters) : []
     const roleGames = new Map<string, number>()
     for (const row of rows) roleGames.set(row.role, (roleGames.get(row.role) ?? 0) + row.games)
     const coverage: ResearchCoverageRow[] = rows.map((row) => ({
@@ -148,12 +199,41 @@ export class ResearchService {
       roleGames: roleGames.get(row.role) ?? 0,
     }))
     this.requestTimes = this.requestTimes.filter((at) => at > this.now() - REQUEST_WINDOW_MS)
+    const focusChampion =
+      status.focusChampionId === null
+        ? null
+        : (champions.find((champion) => champion.id === status.focusChampionId) ?? null)
+    const focusGames =
+      snapshot && focusChampion && status.focusRole
+        ? championRoleTotals(this.db, snapshot.id, focusChampion.key, status.focusRole).games
+        : 0
+    const counts = snapshot
+      ? researchFilterCounts(this.db, snapshot.id, filters)
+      : { totalGames: 0, includedGames: 0, excludedInferred: 0, excludedUnknownTier: 0 }
+    let timelineRows = 0
+    if (snapshot) {
+      try {
+        timelineRows = researchTimelineCount(this.db, snapshot.id)
+      } catch {
+        // An older database without the timeline table still has to render its research data.
+        timelineRows = 0
+      }
+    }
     const startedAt = status.startedAt
     const elapsed = startedAt === null ? 0 : Math.max(1, this.now() - startedAt)
-    const remaining = Math.max(0, status.targetMatches - status.matches)
+    const remaining = status.focusChampionId
+      ? Math.max(0, status.focusTarget - focusGames)
+      : Math.max(0, status.targetMatches - status.matches)
     const rate = elapsed > 0 ? status.matches / elapsed : 0
     return {
       ...status,
+      filters,
+      timelineMode: this.getTimelineMode(),
+      timelineEvents: timelineRows,
+      includedGames: counts.includedGames,
+      excludedInferred: counts.excludedInferred,
+      excludedUnknownTier: counts.excludedUnknownTier,
+      focusGames,
       patch: this.currentPatch() ?? status.patch,
       requestsPerMinute: this.requestTimes.length,
       etaSeconds:
@@ -164,22 +244,24 @@ export class ResearchService {
     }
   }
 
-  summary(): ResearchSummary {
-    const status = this.status()
+  summary(filtersInput?: unknown): ResearchSummary {
+    const filters = parseResearchFilters(filtersInput)
+    const status = this.status(filters)
     const snapshot = status.snapshot
     if (!snapshot) return { status, champions: [], items: [] }
-
     const version = this.source.latestVersion()
     const champions = version === null ? [] : this.source.champions(version)
     const items = version === null ? [] : this.source.items(version)
     const byKey = new Map(champions.map((champion) => [champion.key, champion]))
     const byId = new Map(items.map((item) => [item.id, item]))
-    const totalGames = status.participants
+    // Only games with a role can be a champion or item denominator.
+    const totalGames = status.coverage.reduce((sum, row) => sum + row.games, 0)
     const totalMatches = status.matches
 
-    const championStats: ResearchChampionStat[] = researchChampionRows(
+    const championStats: ResearchChampionStat[] = researchChampionRowsFiltered(
       this.db,
       snapshot.id,
+      filters,
     ).map((row) => {
       const champion = byKey.get(row.championKey)
       return {
@@ -193,26 +275,81 @@ export class ResearchService {
       }
     })
 
-    const itemStats: ResearchItemStat[] = researchItemRows(this.db, snapshot.id).map((row) => ({
-      itemId: row.itemId,
-      name: byId.get(row.itemId)?.name ?? `Item ${row.itemId}`,
-      purchases: row.purchases,
-      wins: row.wins,
-      winRate: row.purchases === 0 ? 0 : row.wins / row.purchases,
-      inclusionRate: totalGames === 0 ? 0 : row.purchases / totalGames,
-    }))
+    const itemStats: ResearchItemStat[] = researchItemRowsFiltered(
+      this.db,
+      snapshot.id,
+      filters,
+    ).flatMap((row) => {
+      // Only real Summoner's Rift shop stock; unknown/event/legacy ids never reach the table.
+      const item = byId.get(row.itemId)
+      if (!item || !isPurchasableOnSR(item)) return []
+      return [
+        {
+          itemId: row.itemId,
+          name: item.name,
+          purchases: row.purchases,
+          wins: row.wins,
+          winRate: row.purchases === 0 ? 0 : row.wins / row.purchases,
+          inclusionRate: totalGames === 0 ? 0 : row.purchases / totalGames,
+        },
+      ]
+    })
 
     return { status, champions: championStats, items: itemStats }
+  }
+
+  audit(championId: string, role: string, filtersInput?: unknown): ResearchAudit | null {
+    const filters: ResearchFilters = parseResearchFilters(filtersInput)
+    const status = this.status(filters)
+    const snapshot = status.snapshot
+    const version = this.source.latestVersion()
+    if (!snapshot || version === null) return null
+    const champion = this.source
+      .champions(version)
+      .find((entry) => entry.id === championId)
+    if (!champion) return null
+    const rows = researchAuditRows(this.db, snapshot.id, champion.key, role)
+    const counts = researchFilterCounts(this.db, snapshot.id, filters, champion.key, role)
+    return {
+      championId,
+      role,
+      patch: snapshot.patch,
+      games: rows.games,
+      matches: rows.matches,
+      tiers: rows.tiers,
+      roleSources: rows.roleSources,
+      filters,
+      tierScope: tierScopeLabel(filters),
+      roleScope: roleScopeLabel(filters),
+      includedGames: counts.includedGames,
+      excludedInferred: counts.excludedInferred,
+      excludedUnknownTier: counts.excludedUnknownTier,
+    }
   }
 
   setOptions(options: ResearchStartOptions): ResearchStatus {
     const crawl = getResearchCrawl(this.db)
     const target = clampTarget(options.targetMatches, crawl.targetMatches)
     const cap = clampCap(options.dailyRequestCap, crawl.dailyRequestCap)
+    const focusChampionId =
+      options.focusChampionId === undefined
+        ? crawl.focusChampionId
+        : (options.focusChampionId?.trim() || null)
+    const focusRole =
+      options.focusRole === undefined
+        ? crawl.focusRole
+        : (options.focusRole?.trim() || null)
+    const focusTarget = clampFocusTarget(options.focusTarget, crawl.focusTarget)
+    const focusChanged =
+      crawl.focusChampionId !== focusChampionId || crawl.focusRole !== focusRole
+    if (focusChanged) clearFrontier(this.db)
     saveResearchCrawl(this.db, {
       targetMatches: target,
       dailyRequestCap: cap,
       emeraldPlus: options.emeraldPlus ?? crawl.emeraldPlus,
+      focusChampionId,
+      focusRole: focusChampionId ? focusRole : null,
+      focusTarget,
       updatedAt: this.now(),
     })
     const snapshot = latestResearchSnapshot(this.db)
@@ -230,8 +367,25 @@ export class ResearchService {
     const target = clampTarget(options.targetMatches, crawl.targetMatches)
     const cap = clampCap(options.dailyRequestCap, crawl.dailyRequestCap)
     const emeraldPlus = options.emeraldPlus ?? crawl.emeraldPlus
+    const focusChampionId =
+      options.focusChampionId === undefined
+        ? crawl.focusChampionId
+        : (options.focusChampionId?.trim() || null)
+    const focusRole =
+      options.focusRole === undefined ? crawl.focusRole : (options.focusRole?.trim() || null)
+    const focusTarget = clampFocusTarget(options.focusTarget, crawl.focusTarget)
+    if (focusChampionId && !focusRole) {
+      throw new Error('Choose a role for the focused champion.')
+    }
+    const version = this.source.latestVersion()
+    const champions = version === null ? [] : this.source.champions(version)
+    if (focusChampionId && !champions.some((champion) => champion.id === focusChampionId)) {
+      throw new Error(`Unknown focus champion: ${focusChampionId}`)
+    }
     const changedPatch = crawl.patch !== patch
-    if (changedPatch) clearFrontier(this.db)
+    const changedFocus =
+      crawl.focusChampionId !== focusChampionId || crawl.focusRole !== focusRole
+    if (changedPatch || changedFocus) clearFrontier(this.db)
     resetProcessingFrontier(this.db)
 
     let snapshot = researchSnapshotForPatch(this.db, patch)
@@ -258,16 +412,26 @@ export class ResearchService {
       targetMatches: target,
       dailyRequestCap: cap,
       emeraldPlus,
+      focusChampionId,
+      focusRole: focusChampionId ? focusRole : null,
+      focusTarget,
       startedAt: crawl.startedAt ?? this.now(),
       lastError: null,
-      seedsExhausted: changedPatch
+      seedsExhausted: changedPatch || changedFocus
         ? false
-        : target > crawl.targetMatches
+        : target > crawl.targetMatches || focusTarget > crawl.focusTarget
           ? false
           : crawl.seedsExhausted,
       updatedAt: this.now(),
     })
-    this.counters = { saved: 0, skipped: 0, failed: 0, seedPlayers: 0 }
+    this.counters = {
+      saved: 0,
+      skipped: 0,
+      failed: 0,
+      seedPlayers: 0,
+      timelines: 0,
+      timelineFailures: 0,
+    }
     this.launch()
     return this.status()
   }
@@ -332,7 +496,18 @@ export class ResearchService {
         const snapshot = latestResearchSnapshot(this.db)
         if (!snapshot) break
         const counts = researchCounts(this.db, snapshot.id)
-        if (counts.matches >= crawl.targetMatches) {
+        const focusGames = this.focusGamesFor(snapshot.id, crawl)
+        if (crawl.focusChampionId) {
+          if (focusGames >= crawl.focusTarget) {
+            clearFrontier(this.db)
+            saveResearchCrawl(this.db, {
+              state: 'complete',
+              lastError: null,
+              updatedAt: this.now(),
+            })
+            break
+          }
+        } else if (counts.matches >= crawl.targetMatches) {
           saveResearchCrawl(this.db, {
             state: 'complete',
             lastError: null,
@@ -372,6 +547,15 @@ export class ResearchService {
   private hasDailyBudget(): boolean {
     const crawl = getResearchCrawl(this.db)
     return crawl.requestsToday < crawl.dailyRequestCap || crawl.requestDay !== dayKey(this.now())
+  }
+
+  private focusGamesFor(snapshotId: number, crawl: ReturnType<typeof getResearchCrawl>): number {
+    if (!crawl.focusChampionId || !crawl.focusRole) return 0
+    const version = this.source.latestVersion()
+    const champions = version === null ? [] : this.source.champions(version)
+    const champion = champions.find((entry) => entry.id === crawl.focusChampionId)
+    if (!champion) return 0
+    return championRoleTotals(this.db, snapshotId, champion.key, crawl.focusRole).games
   }
 
   private async processOne(snapshotId: number, target: number): Promise<boolean> {
@@ -417,7 +601,17 @@ export class ResearchService {
 
     const patch = getResearchCrawl(this.db).patch
     if (!patch) throw new ResearchHalt('Research patch is not set.')
-    for (const matchId of matchIds) {
+    const crawl = getResearchCrawl(this.db)
+    const version = this.source.latestVersion()
+    const focusChampion =
+      crawl.focusChampionId === null || version === null
+        ? null
+        : (this.source
+            .champions(version)
+            .find((champion) => champion.id === crawl.focusChampionId) ?? null)
+    const focusNext = new Set<string>()
+    const page = matchIds.slice(player.matchOffset, player.matchOffset + ROUND_MATCHES)
+    for (const matchId of page) {
       if (isResearchMatchSeen(this.db, matchId)) {
         this.counters.skipped += 1
         continue
@@ -444,18 +638,128 @@ export class ResearchService {
         )
         continue
       }
-      if (saveResearchMatch(this.db, snapshotId, match, player.tierBucket)) {
+      const stored = saveResearchMatch(this.db, snapshotId, match, player.tierBucket)
+      if (stored) {
         this.counters.saved += 1
         markResearchMatchSeen(this.db, matchId, patch, this.now(), null)
+        const focusMatch =
+          focusChampion !== null &&
+          crawl.focusRole !== null &&
+          match.participants.some(
+            (participant) =>
+              participant.championId === focusChampion.key &&
+              participant.position === crawl.focusRole,
+          )
+        await this.collectTimeline(
+          match,
+          player.tierBucket,
+          crawl.focusChampionId !== null,
+          focusMatch,
+        )
       } else {
         this.counters.skipped += 1
         markResearchMatchSeen(this.db, matchId, patch, this.now(), 'duplicate')
       }
+      if (focusChampion && crawl.focusRole) {
+        for (const participant of match.participants) {
+          if (
+            participant.championId === focusChampion.key &&
+            participant.position === crawl.focusRole &&
+            participant.puuid !== player.puuid
+          ) {
+            focusNext.add(participant.puuid)
+          }
+        }
+      }
       const counts = researchCounts(this.db, snapshotId)
-      if (counts.matches >= target) break
+      if (crawl.focusChampionId) {
+        if (this.focusGamesFor(snapshotId, crawl) >= crawl.focusTarget) break
+      } else if (counts.matches >= target) {
+        break
+      }
     }
-    removeFrontierPlayer(this.db, player.puuid)
+    const nextOffset = player.matchOffset + ROUND_MATCHES
+    const focusDone =
+      crawl.focusChampionId !== null &&
+      this.focusGamesFor(snapshotId, crawl) >= crawl.focusTarget
+    const matchesDone =
+      crawl.focusChampionId === null &&
+      researchCounts(this.db, snapshotId).matches >= target
+    if (nextOffset < matchIds.length && !focusDone && !matchesDone) {
+      rescheduleFrontierPlayer(this.db, player.puuid, nextOffset, this.now())
+    } else {
+      removeFrontierPlayer(this.db, player.puuid)
+    }
+    if (crawl.focusChampionId) {
+      for (const puuid of focusNext) {
+        addFrontierPlayer(this.db, puuid, player.tierBucket, this.now(), 1)
+      }
+    }
     return true
+  }
+
+  /**
+   * One extra Riot request per sampled match. Timeline failures are counted and never stop
+   * the crawl; the compact rows are written for every participant of the match.
+   */
+  private async collectTimeline(
+    match: Match,
+    tierBucket: string | null,
+    focusMode: boolean,
+    focusMatch: boolean,
+  ): Promise<void> {
+    const mode = this.getTimelineMode()
+    if (mode === 'off') return
+    const sampled = focusMode ? focusMatch : shouldCollectTimeline(mode, match.id)
+    if (!sampled) return
+    const rawFetcher = this.provider.getTimelineRaw?.bind(this.provider)
+    const parsedFetcher = this.provider.getTimeline?.bind(this.provider)
+    if (!rawFetcher && !parsedFetcher) return
+    if (!this.hasDailyBudget()) throw new ResearchHalt('Daily request cap reached.')
+
+    const events = await this.fetchTimelineEvents(match.id, rawFetcher, parsedFetcher)
+    if (events === null) return
+
+    const version = this.source.latestVersion()
+    const items = version === null ? [] : this.source.items(version)
+    try {
+      const compacted = new Map<number, CompactedTimeline>()
+      for (const participant of match.participants) {
+        compacted.set(
+          participant.participantId,
+          compactTimeline(events, participant.participantId, items),
+        )
+      }
+      this.counters.timelines += saveResearchTimelines(this.db, match, tierBucket, compacted)
+    } catch {
+      // Compaction or storage problems must not stop match collection.
+      this.counters.timelineFailures += 1
+    }
+  }
+
+  /** Returns null when the timeline could not be fetched and the crawl should continue. */
+  private async fetchTimelineEvents(
+    matchId: string,
+    rawFetcher: ((matchId: string) => Promise<unknown>) | undefined,
+    parsedFetcher: ((matchId: string) => Promise<TimelineEvent[]>) | undefined,
+  ): Promise<readonly ResearchTimelineEventLike[] | null> {
+    const fetchRaw = rawFetcher
+    const fetchParsed = parsedFetcher
+    try {
+      if (fetchRaw) {
+        const raw = await this.riot(() => fetchRaw(matchId))
+        return parseResearchTimeline(raw)
+      }
+      if (fetchParsed) {
+        return await this.riot(() => fetchParsed(matchId))
+      }
+      return null
+    } catch (error) {
+      // Timelines are optional evidence: a failed request must never pause the whole crawl.
+      if (isRiotCircuitOpen(error) || error instanceof ResearchHalt) throw error
+      this.counters.timelineFailures += 1
+      return null
+    }
   }
 
   private async seedFrontier(target: number): Promise<number> {

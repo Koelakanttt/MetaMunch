@@ -119,9 +119,20 @@ export class HttpRiotApiProvider implements RiotApiProvider {
     return parseTimeline(await this.request(`/lol/match/v5/matches/${matchId}/timeline`))
   }
 
+  async getTimelineRaw(matchId: string): Promise<unknown> {
+    return this.request(`/lol/match/v5/matches/${matchId}/timeline`)
+  }
+
   async getLeagueEntries(query: LeagueEntriesQuery): Promise<LeagueEntry[]> {
     if (!this.platformBaseUrl) throw new Error('A platform is required for league entries')
     const path = `/lol/league-exp/v4/entries/${query.queue}/${query.tier}/${query.division}?page=${query.page}`
+    const entries = LeagueEntriesSchema.parse(await this.request(path, this.platformBaseUrl))
+    return entries.map(leagueEntry)
+  }
+
+  async getLeagueEntriesByPuuid(puuid: string): Promise<LeagueEntry[]> {
+    if (!this.platformBaseUrl) throw new Error('A platform is required for league entries')
+    const path = `/lol/league/v4/entries/by-puuid/${encodeURIComponent(puuid)}`
     const entries = LeagueEntriesSchema.parse(await this.request(path, this.platformBaseUrl))
     return entries.map(leagueEntry)
   }

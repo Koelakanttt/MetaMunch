@@ -75,6 +75,7 @@ export class MatchHistoryService {
         items: row.items
           .filter((id) => id > 0)
           .map((id) => ({ id, name: itemNames.get(id) ?? `Item ${id}` })),
+        reviewed: row.reviewed,
       }
     })
 

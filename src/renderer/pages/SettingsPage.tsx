@@ -2,7 +2,17 @@ import { useEffect, useState } from 'react'
 import { DEFAULT_REGION, REGIONS, regionInfo, type RegionPlatform } from '@shared/region'
 import type { NetworkDiagnostics } from '@shared/diagnostics'
 import { THEMES, DEFAULT_THEME, type ThemeId } from '@shared/theme'
-import { Badge, Button, Card, Label, Select, StatusLine, TextInput } from '../components/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  Label,
+  PageHeader,
+  PageLayout,
+  Select,
+  StatusLine,
+  TextInput,
+} from '../components/ui'
 
 interface SettingsStatus {
   hasRiotKey: boolean
@@ -11,6 +21,8 @@ interface SettingsStatus {
   leaguePath: string | null
   externalStatsEnabled: boolean
   theme: ThemeId
+  labsEnabled: boolean
+  disclaimerAcknowledged: boolean
 }
 
 interface StaticStatus {
@@ -39,6 +51,7 @@ export function SettingsPage({
   onAccountChanged,
   onRegionChanged,
   onThemeChanged,
+  onLabsChanged,
 }: {
   setup?: boolean
   onSkip?: () => void
@@ -47,6 +60,7 @@ export function SettingsPage({
   onAccountChanged: () => void
   onRegionChanged: (region: RegionPlatform) => void
   onThemeChanged: (theme: ThemeId) => void
+  onLabsChanged?: (enabled: boolean) => void
 }) {
   const [settings, setSettings] = useState<SettingsStatus | null>(null)
   const [keyInput, setKeyInput] = useState('')
@@ -64,6 +78,7 @@ export function SettingsPage({
   const [statsSourceMessage, setStatsSourceMessage] = useState('')
   const [savingTheme, setSavingTheme] = useState(false)
   const [themeMessage, setThemeMessage] = useState('')
+  const [labsMessage, setLabsMessage] = useState('')
   const [emeraldPlus, setEmeraldPlus] = useState(false)
   const [savingResearchSeed, setSavingResearchSeed] = useState(false)
   const [researchSeedMessage, setResearchSeedMessage] = useState('')
@@ -190,6 +205,18 @@ export function SettingsPage({
     }
   }
 
+  async function toggleLabs(): Promise<void> {
+    setLabsMessage('')
+    try {
+      const next = !settings?.labsEnabled
+      await window.api.invoke('settings:setLabs', { enabled: next })
+      setSettings(await window.api.invoke('settings:get', {}))
+      onLabsChanged?.(next)
+    } catch (error) {
+      setLabsMessage(`failed: ${errorMessage(error)}`)
+    }
+  }
+
   async function updateData(): Promise<void> {
     setUpdating(true)
     setUpdateMessage('')
@@ -255,7 +282,7 @@ export function SettingsPage({
     try {
       const res = await window.api.invoke('matches:sync', {})
       setAccountMessage(
-        `saved ${res.saved} new, ${res.skippedExisting} already stored, ${res.failed} failed`,
+        `saved ${res.saved} new of ${res.requested} candidates, ${res.skippedExisting} already stored, ${res.filtered} filtered (non-SR/remake), ${res.failed} failed`,
       )
       await loadMatchStatus()
       onAccountChanged()
@@ -436,6 +463,27 @@ export function SettingsPage({
     </Card>
   )
 
+  const labsCard = (
+    <Card title="Labs">
+      <label className="flex items-center gap-2 text-sm text-slate-300">
+        <input
+          type="checkbox"
+          checked={settings?.labsEnabled ?? false}
+          onChange={() => {
+            void toggleLabs()
+          }}
+        />
+        Enable Labs features
+      </label>
+      <StatusLine tone="muted">
+        Features that may need Riot registration before a public release: the Game page, champion
+        select, research crawl controls and experimental item-value math. Off by default on a fresh
+        install.
+      </StatusLine>
+      {labsMessage ? <StatusLine tone="error">{labsMessage}</StatusLine> : null}
+    </Card>
+  )
+
   const researchSeedCard = (
     <Card title="Research crawl">
       <label className="flex items-center gap-2 text-sm text-slate-300">
@@ -503,12 +551,13 @@ export function SettingsPage({
 
   if (setup) {
     return (
-      <div className="mx-auto max-w-xl space-y-4">
-        <Card title="Welcome to MetaMunch">
-          <p>
-            MetaMunch shows recommended items for your champion and tracks your personal record
-            from public Riot data.
-          </p>
+      <PageLayout>
+        <PageHeader
+          title="Welcome to MetaMunch"
+          subtitle="MetaMunch shows item recommendations for your champion and tracks your personal record from public Riot data. Everything stays on this computer."
+          badges={<Badge tone="accent">first run</Badge>}
+        />
+        <Card title="Start here">
           <p className="text-slate-400">
             You can use static champion recommendations and the local game companion without a Riot
             API key. Add a key later to sync your own matches and enable personal statistics.
@@ -518,7 +567,7 @@ export function SettingsPage({
         {regionCard}
         {leagueCard}
         {statsSourceCard}
-        {researchSeedCard}
+        {settings?.labsEnabled ? researchSeedCard : null}
         {themeCard}
         {legalCard}
         {onSkip ? (
@@ -528,16 +577,17 @@ export function SettingsPage({
             </Button>
           </div>
         ) : null}
-      </div>
+      </PageLayout>
     )
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2">
-        <h2 className="text-lg font-semibold">Settings</h2>
-        <Badge>local data only</Badge>
-      </div>
+    <PageLayout>
+      <PageHeader
+        title="Settings"
+        subtitle="Local-only configuration. The Riot key is stored encrypted and never leaves this computer."
+        badges={<Badge>local data only</Badge>}
+      />
 
       {keyCard}
 
@@ -545,9 +595,11 @@ export function SettingsPage({
 
       {leagueCard}
 
+      {labsCard}
+
       {statsSourceCard}
 
-      {researchSeedCard}
+      {settings?.labsEnabled ? researchSeedCard : null}
 
       {themeCard}
 
@@ -674,6 +726,6 @@ export function SettingsPage({
       </Card>
 
       {legalCard}
-    </div>
+    </PageLayout>
   )
 }

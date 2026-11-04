@@ -11,6 +11,7 @@ export interface HistoryRow {
   position: string
   win: boolean
   items: number[]
+  reviewed: boolean
 }
 
 function placeholders(n: number): string {
@@ -61,8 +62,10 @@ export function historyRows(
 
   const sql = `
     SELECT m.match_id, m.queue_id, m.patch, m.game_creation, m.duration_s,
-           p.champion_id, p.position, p.win, p.items
+           p.champion_id, p.position, p.win, p.items,
+           CASE WHEN r.match_id IS NULL THEN 0 ELSE 1 END AS reviewed
     FROM participants p JOIN matches m ON m.match_id = p.match_id
+    LEFT JOIN match_reviews r ON r.match_id = m.match_id
     WHERE ${clauses.join(' AND ')}
     ORDER BY m.game_creation DESC, p.match_id DESC
     LIMIT ?`
@@ -77,6 +80,7 @@ export function historyRows(
     position: String(row['position']),
     win: Number(row['win']) === 1,
     items: parseItems(row['items']),
+    reviewed: Number(row['reviewed']) === 1,
   }))
 }
 

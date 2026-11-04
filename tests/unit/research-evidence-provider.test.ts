@@ -53,7 +53,7 @@ describe('ResearchEvidenceProvider', () => {
           ? [
               {
                 puuid: 'seed',
-                tier: 'EMERALD',
+                tier: 'DIAMOND',
                 rank: 'I',
                 queueType: 'RANKED_SOLO_5x5',
                 leaguePoints: 0,

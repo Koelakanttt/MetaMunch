@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import type { RiotApiProvider } from '../../src/main/providers/riot-api'
+import { RiotApiError } from '../../src/main/providers/riot-api'
 import { ResearchService } from '../../src/main/services/research-service'
 import type { StaticDataSource } from '../../src/main/services/recommendation-service'
 import { parseChampionList, parseItemList } from '../../src/shared/ddragon'
@@ -40,7 +41,7 @@ describe('ResearchService', () => {
           ? [
               {
                 puuid: 'seed',
-                tier: 'EMERALD',
+                tier: 'DIAMOND',
                 rank: 'I',
                 queueType: 'RANKED_SOLO_5x5',
                 leaguePoints: 0,
@@ -81,5 +82,142 @@ describe('ResearchService', () => {
     })
 
     await expect(service.collect(1)).rejects.toThrow('Static data')
+  })
+
+  it('stores compact timelines for sampled matches', async () => {
+    const db = memoryDb()
+    const provider: RiotApiProvider = {
+      getAccountByRiotId: async () => ({ puuid: 'seed', gameName: 'Seed', tagLine: 'EUW' }),
+      getMatchIds: async () => ['EUW1_7000000001'],
+      getMatch: async () => parseMatch(fixture('match.json')),
+      getLeagueEntries: async () => [
+        {
+          puuid: 'seed',
+          tier: 'DIAMOND',
+          rank: 'I',
+          queueType: 'RANKED_SOLO_5x5',
+          leaguePoints: 0,
+          wins: 0,
+          losses: 0,
+        },
+      ],
+      getTimelineRaw: async () => ({
+        info: {
+          frames: [
+            {
+              events: [
+                { timestamp: 1000, type: 'ITEM_PURCHASED', participantId: 1, itemId: 2003 },
+                { timestamp: 60000, type: 'ITEM_PURCHASED', participantId: 1, itemId: 3033 },
+                {
+                  timestamp: 61000,
+                  type: 'SKILL_LEVEL_UP',
+                  participantId: 1,
+                  skillSlot: 1,
+                  level: 1,
+                  levelUpType: 'NORMAL',
+                },
+              ],
+            },
+          ],
+        },
+      }),
+    }
+    const service = new ResearchService({
+      db,
+      provider,
+      source: source(),
+      getPatch: () => '16.21',
+      getRegion: () => 'EUW1',
+      getTimelineMode: () => 'full',
+      now: () => 1,
+    })
+
+    await service.collect(1)
+    const status = service.status()
+
+    expect(status.timelineMode).toBe('full')
+    expect(status.timelineEvents).toBe(10)
+    const row = db
+      .prepare('SELECT purchase_order, skill_order FROM research_timelines WHERE participant_id = 1')
+      .get() as Record<string, unknown>
+    expect(JSON.parse(String(row['purchase_order']))).toEqual([3033])
+    expect(String(row['skill_order'])).toBe('Q')
+  })
+
+  it('does not request timelines when collection is off', async () => {
+    let timelineCalls = 0
+    const provider: RiotApiProvider = {
+      getAccountByRiotId: async () => ({ puuid: 'seed', gameName: 'Seed', tagLine: 'EUW' }),
+      getMatchIds: async () => ['EUW1_7000000001'],
+      getMatch: async () => parseMatch(fixture('match.json')),
+      getLeagueEntries: async () => [
+        {
+          puuid: 'seed',
+          tier: 'DIAMOND',
+          rank: 'I',
+          queueType: 'RANKED_SOLO_5x5',
+          leaguePoints: 0,
+          wins: 0,
+          losses: 0,
+        },
+      ],
+      getTimelineRaw: async () => {
+        timelineCalls += 1
+        return { info: { frames: [] } }
+      },
+    }
+    const service = new ResearchService({
+      db: memoryDb(),
+      provider,
+      source: source(),
+      getPatch: () => '16.21',
+      getRegion: () => 'EUW1',
+      getTimelineMode: () => 'off',
+      now: () => 1,
+    })
+
+    await service.collect(1)
+
+    expect(timelineCalls).toBe(0)
+    expect(service.status().timelineEvents).toBe(0)
+  })
+
+  it('keeps collecting matches when a timeline request fails', async () => {
+    const provider: RiotApiProvider = {
+      getAccountByRiotId: async () => ({ puuid: 'seed', gameName: 'Seed', tagLine: 'EUW' }),
+      getMatchIds: async () => ['EUW1_7000000001'],
+      getMatch: async () => parseMatch(fixture('match.json')),
+      getLeagueEntries: async () => [
+        {
+          puuid: 'seed',
+          tier: 'DIAMOND',
+          rank: 'I',
+          queueType: 'RANKED_SOLO_5x5',
+          leaguePoints: 0,
+          wins: 0,
+          losses: 0,
+        },
+      ],
+      getTimelineRaw: async () => {
+        throw new RiotApiError(429, 'rate limited')
+      },
+    }
+    const service = new ResearchService({
+      db: memoryDb(),
+      provider,
+      source: source(),
+      getPatch: () => '16.21',
+      getRegion: () => 'EUW1',
+      getTimelineMode: () => 'full',
+      now: () => 1,
+    })
+
+    const result = await service.collect(1)
+    const status = service.status()
+
+    expect(result.saved).toBe(1)
+    expect(status.state).toBe('complete')
+    expect(status.lastError).toBeNull()
+    expect(status.timelineEvents).toBe(0)
   })
 })

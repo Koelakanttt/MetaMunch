@@ -63,14 +63,14 @@ function seed() {
   saveTimelineEvents(
     db,
     'EUW1_1',
-    [purchased(60000, 1054), purchased(120000, 1001)],
+    [purchased(15000, 2003), purchased(60000, 3033), purchased(120000, 1036)],
     participants,
     new Set([ME]),
   )
   saveTimelineEvents(
     db,
     'EUW1_2',
-    [purchased(120000, 1054)],
+    [purchased(5000, 2003), purchased(120000, 3033)],
     participants,
     new Set([ME]),
   )
@@ -89,9 +89,35 @@ describe('PurchaseOrderService', () => {
 
     expect(result.sampleMatches).toBe(2)
     expect(result.hasTimeline).toBe(true)
-    expect(result.items[0]).toMatchObject({ itemId: 1054, games: 2, averageSeconds: 90 })
-    expect(result.items[1]).toMatchObject({ itemId: 1001, games: 1, averageSeconds: 120 })
-    expect(result.paths[0]?.items.map((item) => item.itemId)).toEqual([1054, 1001])
+    expect(result.items.map((item) => item.itemId)).toEqual([3033, 1036])
+    expect(result.items[0]).toMatchObject({ itemId: 3033, games: 2, averageSeconds: 90 })
+    expect(result.items[1]).toMatchObject({ itemId: 1036, games: 1, averageSeconds: 120 })
+    expect(result.paths[0]?.items.map((item) => item.itemId)).toEqual([3033, 1036])
+  })
+
+  it('sorts purchase timings by average time ascending', () => {
+    const service = new PurchaseOrderService({
+      db: seed(),
+      source: source(),
+      getAccount: () => ACCOUNT,
+    })
+
+    const times = service.forChampion('Garen').items.map((item) => item.averageSeconds)
+    expect(times).toEqual([...times].sort((a, b) => a - b))
+  })
+
+  it('keeps starting items out of timings and recorded paths', () => {
+    const service = new PurchaseOrderService({
+      db: seed(),
+      source: source(),
+      getAccount: () => ACCOUNT,
+    })
+
+    const result = service.forChampion('Garen')
+    expect(result.items.some((item) => item.itemId === 2003)).toBe(false)
+    expect(
+      result.paths.every((path) => path.items.every((item) => item.itemId !== 2003)),
+    ).toBe(true)
   })
 
   it('returns an empty state without an account', () => {

@@ -4,7 +4,15 @@ import type { PostGameResult } from '@shared/post-game'
 import type { RecommendationView, RecommendResponse } from '@shared/recommend-api'
 import { ROLES, type Role } from '@shared/rules'
 import { ChampionIcon, ItemIcon } from '../components/Icon'
-import { Button, Card, EmptyState, StatusLine } from '../components/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  PageHeader,
+  PageLayout,
+  StatusLine,
+} from '../components/ui'
 
 const QUEUE_NAMES: Record<number, string> = {
   400: 'Normal',
@@ -155,9 +163,12 @@ export function GamePage() {
 
   if (!live) {
     return (
-      <Card title="Game">
-        <StatusLine tone="muted">Checking the live game…</StatusLine>
-      </Card>
+      <PageLayout>
+        <PageHeader title="Game" subtitle="Read-only live game and post-game comparison." />
+        <Card>
+          <StatusLine tone="muted">Checking the live game…</StatusLine>
+        </Card>
+      </PageLayout>
     )
   }
 
@@ -166,7 +177,12 @@ export function GamePage() {
     const next = suggestions ? nextItems(suggestions, owned) : []
 
     return (
-      <section className="space-y-4">
+      <PageLayout width="wide">
+        <PageHeader
+          title="Game"
+          subtitle="Read-only live client data. Options are what the research sample bought; nothing is automated."
+          badges={<Badge tone="accent">live</Badge>}
+        />
         <Card title="Live game">
           <StatusLine>
             {`${live.gameMode || 'game'} · ${live.mapName || 'map'} · ${formatDuration(live.gameTime)}`}
@@ -213,21 +229,21 @@ export function GamePage() {
           </StatusLine>
         </Card>
 
-        <Card title="Next items">
+        <Card title="Options seen in the research sample">
           {!live.me.championId ? (
             <EmptyState>
               Your champion is not resolved because static data is missing. Press &quot;Update
               data&quot; in Settings.
             </EmptyState>
           ) : suggestLoading ? (
-            <StatusLine tone="muted">loading tips…</StatusLine>
+            <StatusLine tone="muted">loading options…</StatusLine>
           ) : suggestError ? (
             <StatusLine tone="error">error: {suggestError}</StatusLine>
           ) : next.length === 0 ? (
-            <EmptyState>You already own the recommended items.</EmptyState>
+            <EmptyState>No unowned options in the sample.</EmptyState>
           ) : (
             <ol className="space-y-2">
-              {next.map((item) => (
+              {next.slice(0, 3).map((item) => (
                 <li
                   key={item.itemId}
                   className="flex gap-3 rounded-lg border border-slate-800 bg-slate-950/60 p-3"
@@ -243,29 +259,37 @@ export function GamePage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-baseline gap-2">
                       <strong className="font-medium text-slate-100">{item.name}</strong>
-                      <span className="text-xs text-slate-500">[{item.source}]</span>
+                      <span className="text-xs text-slate-500">
+                        [{item.source === 'personal'
+                          ? 'own sample'
+                          : item.source === 'research'
+                            ? 'research sample'
+                            : 'rules/class'}]
+                      </span>
                     </div>
-                    {item.reasons.length > 0 ? (
-                      <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-slate-400">
-                        {item.reasons.slice(0, 2).map((reason, index) => (
-                          <li key={index}>{reason}</li>
-                        ))}
-                      </ul>
-                    ) : null}
+                    <div className="text-xs text-slate-400">
+                      {item.evidence
+                        ? `${item.evidence.games} games · ${Math.round(item.evidence.pickRate * 100)}% pick`
+                        : 'No sample size available for this option.'}
+                    </div>
                   </div>
                 </li>
               ))}
             </ol>
           )}
         </Card>
-      </section>
+      </PageLayout>
     )
   }
 
   const readyReview = review?.state === 'ready' ? review.review : null
 
   return (
-    <section className="space-y-4">
+    <PageLayout width="wide">
+      <PageHeader
+        title="Game"
+        subtitle="Post-game comparison of your purchases against the research build."
+      />
       {live.state === 'error' ? (
         <Card title="Live game">
           <StatusLine tone="error">{live.message}</StatusLine>
@@ -284,7 +308,7 @@ export function GamePage() {
             {reviewLoading ? 'loading…' : 'Refresh review'}
           </Button>
           <StatusLine tone="muted">
-            Compares what you bought with recommendations regenerated for that game.
+            Compares your purchases with the research build for that game.
           </StatusLine>
         </div>
         {reviewError ? <StatusLine tone="error">error: {reviewError}</StatusLine> : null}
@@ -326,9 +350,9 @@ export function GamePage() {
             ) : null}
           </Card>
 
-          <Card title="Missed from the recommendation">
+          <Card title="Compared with the research build">
             {readyReview.missed.length === 0 ? (
-              <EmptyState>You bought every recommended item.</EmptyState>
+              <EmptyState>No unmatched items in the comparison.</EmptyState>
             ) : (
               <ul className="list-disc space-y-1 pl-5 text-sm text-amber-400">
                 {readyReview.missed.map((name) => (
@@ -356,6 +380,6 @@ export function GamePage() {
           </Card>
         </>
       ) : null}
-    </section>
+    </PageLayout>
   )
 }

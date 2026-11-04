@@ -165,4 +165,49 @@ describe('SettingsService', () => {
     )
     expect(settings.theme()).toBe('pixel')
   })
+
+  it('persists the research filters and ignores corrupted storage', () => {
+    const db = memoryDb()
+    const settings = new SettingsService({ db, crypto: fakeCrypto(), envKey: null })
+
+    expect(settings.researchFilters()).toEqual({
+      tier: 'diamond',
+      includeInferred: false,
+      includeUnknownTier: false,
+    })
+
+    settings.saveResearchFilters({
+      tier: 'master',
+      includeInferred: true,
+      includeUnknownTier: true,
+    })
+    expect(settings.researchFilters()).toEqual({
+      tier: 'master',
+      includeInferred: true,
+      includeUnknownTier: true,
+    })
+
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(
+      'research.filters',
+      '{not json',
+    )
+    expect(settings.researchFilters().tier).toBe('diamond')
+  })
+
+  it('defaults timeline collection to 25% and rejects unknown modes', () => {
+    const db = memoryDb()
+    const settings = new SettingsService({ db, crypto: fakeCrypto(), envKey: null })
+
+    expect(settings.researchTimelineMode()).toBe('quarter')
+
+    settings.saveResearchTimelineMode('full')
+    expect(settings.researchTimelineMode()).toBe('full')
+    expect(() => settings.saveResearchTimelineMode('half')).toThrow('Unknown timeline')
+
+    db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(
+      'research.timeline_mode',
+      'half',
+    )
+    expect(settings.researchTimelineMode()).toBe('quarter')
+  })
 })

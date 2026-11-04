@@ -64,6 +64,12 @@ describe('RateLimiter', () => {
     await run(2)
     expect(times).toEqual([0, 1000])
   })
+  it('does not issue more than 60 requests in a two-minute window', async () => {
+    const { times, run } = setup([{ limit: 60, windowMs: 120000 }])
+    await run(61)
+    expect(times.filter((at) => at === 0)).toHaveLength(60)
+    expect(times.some((at) => at >= 120000)).toBe(true)
+  })
 })
 
 describe('header parsing', () => {

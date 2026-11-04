@@ -237,3 +237,27 @@ body {
 [data-theme='pixel'] header {
   border-bottom: var(--mm-border-width) solid var(--mm-accent);
 }
+
+/* Slim scrollbar for bounded dashboard/tab containers. */
+.mm-slim-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--mm-border) transparent;
+}
+
+.mm-slim-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.mm-slim-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mm-slim-scroll::-webkit-scrollbar-thumb {
+  background: var(--mm-border);
+  border-radius: 999px;
+}
+
+.mm-slim-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--mm-accent);
+}

@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type { Champion, Item } from '../../src/shared/ddragon'
 import {
   archetypeOf,
@@ -8,6 +10,7 @@ import {
   recommend,
 } from '../../src/shared/recommend'
 import { itemTraits } from '../../src/shared/item-traits'
+import { DEFAULT_RESEARCH_FILTERS, type ResearchBuildSample } from '../../src/shared/research'
 import { parseChampionTags, parseRules, type Rules } from '../../src/shared/rules'
 import { mkItem, stats } from '../helpers/items'
 
@@ -526,5 +529,89 @@ describe('damageClass', () => {
     expect(damageClass(champ('Kayle', [], 8, 1), t)).toBe('mixed')
     expect(damageClass(garen, tags)).toBe('ad')
     expect(damageClass(ahri, tags)).toBe('ap')
+  })
+})
+
+describe('removed items', () => {
+  const catalogueWithRemoved = [
+    ...catalog,
+    mkItem(3193, 'Gargoyle Stoneplate', {
+      tags: ['Armor', 'SpellBlock'],
+      description: stats([60, 'Armor'], [50, 'Magic Resist']),
+      goldTotal: 3150,
+      purchasable: true,
+      inStore: true,
+      maps: { '11': true },
+    }),
+  ]
+
+  const realRules: Rules = parseRules(
+    JSON.parse(readFileSync(join(process.cwd(), 'data/rules.json'), 'utf8')) as unknown,
+  )
+
+  const research: ResearchBuildSample = {
+    scope: {
+      patch: '16.21',
+      samplePatch: '16.21',
+      region: 'EUW1',
+      rankScope: 'MASTER+',
+      tierScope: 'Diamond+',
+      roleScope: 'Riot-assigned roles only',
+      filters: DEFAULT_RESEARCH_FILTERS,
+      excludedInferred: 0,
+      excludedUnknownTier: 0,
+      championGames: 100,
+      fallback: false,
+    },
+    games: 100,
+    wins: 50,
+    items: [
+      { itemId: 3193, slot: 0, games: 90, wins: 45, winRate: 0.5, pickRate: 0.9 },
+      { itemId: 2, slot: 1, games: 80, wins: 40, winRate: 0.5, pickRate: 0.8 },
+    ],
+    boots: null,
+    rune: null,
+    lanes: [],
+  }
+
+  it('never recommends a removed item the research sample still names', () => {
+    const result = recommend({
+      me: aatrox,
+      role: 'TOP',
+      enemies: [jinx, zed, darius],
+      items: catalogueWithRemoved,
+      tags,
+      rules: realRules,
+      research,
+      source: 'combined',
+    })
+
+    const recommended = [...result.core, ...result.items, ...result.boots].map((item) => item.name)
+    expect(recommended).not.toContain('Gargoyle Stoneplate')
+    expect(result.core.length).toBeGreaterThan(0)
+  })
+
+  it('keeps support-only aura items out of a solo-lane recommendation', () => {
+    const catalogue = [
+      ...catalog,
+      mkItem(2524, 'Bandlepipes', {
+        tags: ['Health', 'Armor', 'SpellBlock', 'AttackSpeed', 'AbilityHaste'],
+        description: stats([200, 'Health'], [20, 'Armor'], [20, 'Magic Resist'], [15, 'Ability Haste']),
+        goldTotal: 2300,
+      }),
+    ]
+
+    const result = recommend({
+      me: aatrox,
+      role: 'TOP',
+      enemies: [ornn, darius, briar],
+      items: catalogue,
+      tags,
+      rules: realRules,
+      source: 'global',
+    })
+
+    const recommended = [...result.core, ...result.items, ...result.boots].map((item) => item.name)
+    expect(recommended).not.toContain('Bandlepipes')
   })
 })

@@ -26,6 +26,7 @@ export interface MatchParticipant {
   teamId: number // 100 or 200
   championId: number // numeric champion key, same as Champion.key
   position: string // TOP | JUNGLE | MIDDLE | BOTTOM | UTILITY, or '' when not applicable
+  individualPosition?: string
   win: boolean
   items: number[] // exactly 6 slots, 0 = empty
   trinket: number // item6, 0 = none
@@ -110,6 +111,7 @@ const ParticipantRaw = z.object({
   teamId: z.number(),
   championId: z.number(),
   teamPosition: z.string().default(''),
+  individualPosition: z.string().default(''),
   win: z.boolean(),
   item0: z.number().default(0),
   item1: z.number().default(0),
@@ -175,6 +177,7 @@ export function parseMatch(json: unknown): Match {
       teamId: p.teamId,
       championId: p.championId,
       position: p.teamPosition,
+      individualPosition: p.individualPosition,
       win: p.win,
       items: [p.item0, p.item1, p.item2, p.item3, p.item4, p.item5],
       trinket: p.item6,

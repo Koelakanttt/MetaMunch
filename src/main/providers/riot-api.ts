@@ -51,8 +51,12 @@ export interface RiotApiProvider {
   getMatch(matchId: string): Promise<Match>
   /** Optional so test providers and static-only providers can omit it. */
   getTimeline?(matchId: string): Promise<TimelineEvent[]>
+  /** Raw match-v5 timeline JSON for compact review summaries. */
+  getTimelineRaw?(matchId: string): Promise<unknown>
   /** Platform-routed ladder entries, used only by the research collector. */
   getLeagueEntries?(query: LeagueEntriesQuery): Promise<LeagueEntry[]>
+  /** Ranked entries for one puuid, used by the personal LP history. */
+  getLeagueEntriesByPuuid?(puuid: string): Promise<LeagueEntry[]>
   /** Apex league endpoints (challenger/grandmaster/master), used only by the research collector. */
   getApexLeagueEntries?(tier: ApexTier): Promise<LeagueEntry[]>
   /** Resolves a summonerId when a league entry has no puuid. */

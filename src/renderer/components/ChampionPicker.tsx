@@ -50,7 +50,7 @@ export function ChampionPicker({
 
   return (
     <div className="flex flex-col gap-1">
-      <Label>{label}</Label>
+      {label ? <Label>{label}</Label> : null}
       <div className="relative">
         {showIcon && selected ? (
           <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2">

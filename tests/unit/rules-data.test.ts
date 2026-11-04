@@ -14,6 +14,11 @@ describe('data files', () => {
     expect(rules.rules.some((r) => r.slot === 'boots')).toBe(true)
     expect(Object.keys(rules.coreByClass)).toContain('Fighter')
     expect(rules.excludeItemsByRole.TOP?.length).toBeGreaterThan(5)
+    expect(rules.excludeItems).toContain('Gargoyle Stoneplate')
+    for (const role of ['TOP', 'JUNGLE', 'MIDDLE', 'BOTTOM'] as const) {
+      expect(rules.excludeItemsByRole[role]).toContain('Bandlepipes')
+    }
+    expect(rules.excludeItemsByRole.UTILITY).toBeUndefined()
     expect(Object.keys(rules.archetypes)).toHaveLength(6)
     expect(rules.archetypes.bruiser?.label).toBe('bruisers')
     expect(rules.groups.map((group) => group.id)).toEqual([

@@ -23,6 +23,7 @@ export interface SyncResult {
   requested: number
   saved: number
   skippedExisting: number
+  filtered: number
   failed: number
 }
 
@@ -125,17 +126,19 @@ export class MatchSyncService {
     }
 
     const ids = [...new Set(collected)].sort((a, b) => numericSuffix(b) - numericSuffix(a))
-    const known = knownMatchIds(this.db, ids)
+    const known = knownMatchIds(this.db, ids, account.puuid)
     const skippedExisting = known.size
     const newIds = ids.filter((id) => !known.has(id)).slice(0, maxNewMatches)
 
     let saved = 0
+    let filtered = 0
     let failed = 0
     let lastError: unknown = null
     for (const matchId of newIds) {
       try {
         const match = await this.provider.getMatch(matchId)
         if (!supportedMatch(match)) {
+          filtered += 1
           continue
         }
         saveMatch(this.db, match, [account.puuid])
@@ -159,6 +162,6 @@ export class MatchSyncService {
 
     if (saved === 0 && failed > 0 && lastError) throw lastError
 
-    return { requested: newIds.length, saved, skippedExisting, failed }
+    return { requested: newIds.length, saved, skippedExisting, filtered, failed }
   }
 }

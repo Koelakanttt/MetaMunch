@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { GeneralStatsFilters, GeneralStatsResponse } from '@shared/general-stats'
 import { ChampionIcon, ItemIcon } from '../components/Icon'
-import { Card, EmptyState, Label, Select, StatusLine } from '../components/ui'
+import { Card, EmptyState, Label, PageHeader, PageLayout, Select, StatusLine, Badge } from '../components/ui'
 
 const QUEUES: { value: number; label: string }[] = [
   { value: 400, label: 'Normal' },
@@ -59,22 +59,31 @@ export function StatsPage({ refreshKey }: { refreshKey: number }) {
 
   if (error) {
     return (
-      <Card title="Stats">
-        <StatusLine tone="error">error: {error}</StatusLine>
-      </Card>
+      <PageLayout>
+        <Card title="Stats">
+          <StatusLine tone="error">error: {error}</StatusLine>
+        </Card>
+      </PageLayout>
     )
   }
 
   if (!data) {
     return (
-      <Card title="Stats">
-        <StatusLine tone="muted">loading…</StatusLine>
-      </Card>
+      <PageLayout>
+        <Card title="Stats">
+          <StatusLine tone="muted">loading…</StatusLine>
+        </Card>
+      </PageLayout>
     )
   }
 
   return (
-    <section className="space-y-4">
+    <PageLayout>
+      <PageHeader
+        title="Stats"
+        subtitle="Aggregated statistics from your own tracked matches only."
+        badges={loading ? <Badge>refreshing</Badge> : null}
+      />
       <Card title="Sample">
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1">
@@ -201,6 +210,6 @@ export function StatsPage({ refreshKey }: { refreshKey: number }) {
       </Card>
 
       {loading ? <StatusLine tone="muted">refreshing…</StatusLine> : null}
-    </section>
+    </PageLayout>
   )
 }

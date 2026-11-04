@@ -1,7 +1,9 @@
 import type { Champion, Item } from './ddragon'
 import type { EvidenceBundle, ItemEvidence } from './evidence'
 import type { ResearchBuildSample, ResearchItemSample } from './research'
-import { buildItemPool, itemTraits, type Trait } from './item-traits'
+import { wilsonLowerBound } from './research-stats'
+import { buildItemPool, isPurchasableOnSR, itemTraits, type Trait } from './item-traits'
+import { itemMath, type ThreatMetrics } from './item-value'
 import type {
   Archetype,
   ArchetypeProfile,
@@ -16,6 +18,7 @@ export type { Archetype } from './rules'
 export { ARCHETYPES } from './rules'
 
 export type Damage = 'ad' | 'ap' | 'mixed'
+export type RecommendSource = 'global' | 'personal' | 'combined'
 
 export interface EnemyProfile {
   metrics: Record<Metric, number>
@@ -33,7 +36,7 @@ export interface Recommendation {
   itemId: number
   name: string
   slot: 'item' | 'boots'
-  source: 'rules' | 'core' | 'personal' | 'research'
+  source: 'rules' | 'core' | 'personal' | 'research' | 'math'
   reasons: string[]
   ruleIds: string[]
   score: number
@@ -58,6 +61,7 @@ export interface RecommendInput {
   prior?: { games: number; build: { name: string; games: number }[] }
   evidence?: EvidenceBundle
   research?: ResearchBuildSample
+  source?: RecommendSource
 }
 
 export const MAX_ITEMS = 6
@@ -279,8 +283,17 @@ function evidenceBonus(evidence: ItemEvidence | undefined): number {
   return evidence.deltaWinRate * 100
 }
 
-function byRank(a: Ranked, b: Ranked): number {
-  return b.score - a.score || b.item.goldTotal - a.item.goldTotal || a.item.id - b.item.id
+function byRank(
+  a: Ranked,
+  b: Ranked,
+  mathTie: ReadonlyMap<number, number>,
+): number {
+  return (
+    b.score - a.score ||
+    b.item.goldTotal - a.item.goldTotal ||
+    (mathTie.get(b.item.id) ?? 0) - (mathTie.get(a.item.id) ?? 0) ||
+    a.item.id - b.item.id
+  )
 }
 
 function pickSituational(
@@ -293,15 +306,36 @@ function pickSituational(
   archetype: Archetype,
   profile: ArchetypeProfile,
   enemyProfile: EnemyProfile,
+  laneProfile: EnemyProfile,
   limit: number,
   excludeNames: ReadonlySet<string>,
+  mathTie: ReadonlyMap<number, number>,
 ): Recommendation[] {
-  const rules = input.rules.rules.filter((rule) =>
-    ruleApplies(rule, slot, input.role, myDamage, archetype, enemyProfile),
+  const rules = input.rules.rules.filter(
+    (rule) =>
+      rule.slot === slot &&
+      (ruleApplies(rule, slot, input.role, myDamage, archetype, enemyProfile) ||
+        ruleApplies(rule, slot, input.role, myDamage, archetype, laneProfile)),
   )
   const scored = new Map<number, Scored>()
   for (const rule of rules) {
-    const text = formatReason(rule.reason, enemyProfile)
+    const teamApplies = ruleApplies(
+      rule,
+      slot,
+      input.role,
+      myDamage,
+      archetype,
+      enemyProfile,
+    )
+    const laneApplies = ruleApplies(
+      rule,
+      slot,
+      input.role,
+      myDamage,
+      archetype,
+      laneProfile,
+    )
+    const text = formatReason(rule.reason, teamApplies ? enemyProfile : laneProfile)
     for (const item of pool) {
       if (slot === 'boots') {
         const allowlist = input.rules.bootsAllowlist
@@ -321,7 +355,7 @@ function pickSituational(
         reasons: [],
         ruleIds: [],
       }
-      entry.ruleScore += rule.weight + bonus
+      entry.ruleScore += rule.weight + bonus + (laneApplies ? 0.25 : 0)
       entry.reasons.push({ weight: rule.weight, text })
       entry.ruleIds.push(rule.id)
       scored.set(item.id, entry)
@@ -339,7 +373,7 @@ function pickSituational(
       score: entry.ruleScore + fit.score + evidenceBonus(entry.data),
     })
   }
-  ranked.sort(byRank)
+  ranked.sort((a, b) => byRank(a, b, mathTie))
 
   const groupCounts = new Map<string, number>()
   const picked: Recommendation[] = []
@@ -360,7 +394,7 @@ function pickSituational(
     const reasons = entry.reasons
       .sort((a, b) => b.weight - a.weight)
       .map((reason) => reason.text)
-      .slice(0, MAX_REASONS)
+      .slice(0, slot === 'item' ? 1 : MAX_REASONS)
     if (slot === 'item') reasons.push(fitSentence(profile, entry.fit.matched))
 
     picked.push({
@@ -496,31 +530,70 @@ function researchEvidence(
   }
 }
 
-/** Core from the research sample: slot-wise final items, never a recorded path. */
+/** Core from the research sample, with lane math and optional personal preference. */
 function researchCore(
   research: ResearchBuildSample,
   itemsById: ReadonlyMap<number, Item>,
   role: Role,
+  myDamage: Damage,
+  archetype: Archetype,
+  laneMetrics: ThreatMetrics,
+  prior: RecommendInput['prior'],
 ): Recommendation[] {
+  const candidates = research.items
+    .filter((sample) => sample.games >= 30)
+    .map((sample) => ({ sample, item: itemsById.get(sample.itemId) }))
+    // The sample may remember items that left the shop; only current SR stock is usable.
+    .filter(
+      (entry): entry is { sample: ResearchItemSample; item: Item } =>
+        entry.item !== undefined &&
+        isPurchasableOnSR(entry.item) &&
+        !entry.item.tags.includes('Boots'),
+    )
+  const maxUtility = Math.max(
+    1,
+    ...candidates.map(({ item }) => itemMath(item, myDamage, archetype, laneMetrics).utility),
+  )
+  const personalGames = new Map(
+    (prior?.build ?? []).map((entry) => [entry.name, entry.games]),
+  )
+  const scored = candidates.map(({ sample, item }) => {
+    const utility = itemMath(item, myDamage, archetype, laneMetrics).utility / maxUtility
+    const personal = prior && (personalGames.get(item.name) ?? 0) >= 5 ? 0.08 : 0
+    return {
+      sample,
+      item,
+      personal: (personalGames.get(item.name) ?? 0) >= 5,
+      score: sample.pickRate + utility * 0.15 + personal,
+    }
+  })
+  scored.sort(
+    (a, b) =>
+      b.score - a.score ||
+      wilsonLowerBound(b.sample.wins, b.sample.games) -
+        wilsonLowerBound(a.sample.wins, a.sample.games) ||
+      a.item.id - b.item.id,
+  )
+
   const seen = new Set<number>()
   const core: Recommendation[] = []
-  for (const sample of research.items) {
+  for (const entry of scored) {
     if (core.length >= CORE_TARGET) break
-    if (sample.games < 30 || seen.has(sample.itemId)) continue
-    const item = itemsById.get(sample.itemId)
-    if (!item) continue
-    seen.add(sample.itemId)
+    if (seen.has(entry.item.id)) continue
+    seen.add(entry.item.id)
+    const reasons = [
+      `Picked in ${Math.round(entry.sample.pickRate * 100)}% of ${research.games} ${role} games (${Math.round(entry.sample.winRate * 100)}% WR).`,
+    ]
+    if (entry.personal) reasons.push('Also in your usual build.')
     core.push({
-      itemId: item.id,
-      name: item.name,
+      itemId: entry.item.id,
+      name: entry.item.name,
       slot: 'item',
       source: 'research',
-      reasons: [
-        `Picked in ${Math.round(sample.pickRate * 100)}% of ${research.games} ${role} games (${Math.round(sample.winRate * 100)}% WR).`,
-      ],
-      ruleIds: [`research:slot:${sample.slot}`],
-      score: sample.pickRate,
-      evidence: researchEvidence(sample, research.games, research.wins),
+      reasons: reasons.slice(0, MAX_REASONS),
+      ruleIds: [`research:slot:${entry.sample.slot}`],
+      score: entry.score,
+      evidence: researchEvidence(entry.sample, research.games, research.wins),
     })
   }
   return core
@@ -534,7 +607,7 @@ function researchBoots(
   const sample = research.boots
   if (!sample || sample.games < 30) return []
   const item = itemsById.get(sample.itemId)
-  if (!item) return []
+  if (!item || !isPurchasableOnSR(item)) return []
   return [
     {
       itemId: item.id,
@@ -560,24 +633,52 @@ export function recommend(input: RecommendInput): RecommendResult {
     ...input.rules.excludeItems,
     ...(input.rules.excludeItemsByRole[input.role] ?? []),
   ]
-  const pool = buildItemPool(input.items, excluded)
+  const pool = buildItemPool(input.items, excluded, input.role)
   const traitsOf = new Map<number, Trait[]>()
   for (const item of [...pool.items, ...pool.boots]) {
     traitsOf.set(item.id, itemTraits(item))
   }
   const evidenceOf = input.evidence?.items ?? new Map<number, ItemEvidence>()
+  const source = input.source ?? 'combined'
+  const laneProfile = buildEnemyProfile(input.enemies.slice(0, 1), input.tags)
+  const laneMetrics = laneProfile.metrics
 
   const hasPrior = input.prior !== undefined && input.prior.games >= 5
-  const allItemsById = new Map<number, Item>(input.items.map((item) => [item.id, item]))
-  const sampleCore = input.research
-    ? researchCore(input.research, allItemsById, input.role)
-    : []
-  const core = sampleCore.length > 0
-    ? sampleCore
-    : hasPrior
-      ? personalCore(pool.items, traitsOf, input, myDamage)
-      : classCore(pool.items, traitsOf, evidenceOf, input, myDamage, profile)
+  // Research and math lookups resolve only through the lane's SR pool, so an item that left the
+  // shop (or is lane-locked) can never be recommended even if a stored sample still names it.
+  const allItemsById = new Map<number, Item>(
+    [...pool.items, ...pool.boots].map((item) => [item.id, item]),
+  )
+  const sampleCore =
+    input.research && source !== 'personal'
+      ? researchCore(
+          input.research,
+          allItemsById,
+          input.role,
+          myDamage,
+          archetype,
+          laneMetrics,
+          source === 'combined' ? input.prior : undefined,
+        )
+      : []
+  const personal = source !== 'global' ? personalCore(pool.items, traitsOf, input, myDamage) : []
+  const core =
+    source === 'personal'
+      ? personal.length > 0
+        ? personal
+        : classCore(pool.items, traitsOf, evidenceOf, input, myDamage, profile)
+      : sampleCore.length > 0
+        ? sampleCore
+        : source === 'combined' && hasPrior && personal.length > 0
+          ? personal
+          : classCore(pool.items, traitsOf, evidenceOf, input, myDamage, profile)
   const coreNames = new Set(core.map((item) => item.name))
+  const mathTie = new Map<number, number>()
+  for (const item of input.items) {
+    const evidence = evidenceOf.get(item.id)
+    if (!evidence || evidence.games < 30) continue
+    mathTie.set(item.id, itemMath(item, myDamage, archetype, laneMetrics).utility)
+  }
 
   const items = pickSituational(
     'item',
@@ -589,12 +690,15 @@ export function recommend(input: RecommendInput): RecommendResult {
     archetype,
     profile,
     enemyProfile,
+    laneProfile,
     MAX_ITEMS,
     coreNames,
+    mathTie,
   )
-  const sampleBoots = input.research
-    ? researchBoots(input.research, allItemsById, input.role)
-    : []
+  const sampleBoots =
+    input.research && source !== 'personal'
+      ? researchBoots(input.research, allItemsById, input.role)
+      : []
   const boots = sampleBoots.length > 0
     ? sampleBoots
     : pickSituational(
@@ -607,8 +711,10 @@ export function recommend(input: RecommendInput): RecommendResult {
         archetype,
         profile,
         enemyProfile,
+        laneProfile,
         MAX_BOOTS,
         NO_NAMES,
+        mathTie,
       )
 
   return {

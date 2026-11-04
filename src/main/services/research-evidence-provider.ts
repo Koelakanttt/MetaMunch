@@ -4,8 +4,14 @@ import type { EvidenceBundle, ItemEvidence } from '@shared/evidence'
 import { itemTraits } from '@shared/item-traits'
 import type {
   ResearchBuildSample,
+  ResearchFilters,
   ResearchItemSample,
   ResearchRuneSample,
+} from '@shared/research'
+import {
+  DEFAULT_RESEARCH_FILTERS,
+  roleScopeLabel,
+  tierScopeLabel,
 } from '@shared/research'
 import { wilsonLowerBound } from '@shared/research-stats'
 import { toPatch } from '@shared/riot'
@@ -15,6 +21,7 @@ import {
   itemSamples,
   itemSlotSamples,
   laneSamples,
+  researchFilterCounts,
   runeSamples,
 } from '../db/research-aggregate-repo'
 import {
@@ -23,7 +30,7 @@ import {
 } from '../db/research-repo'
 import type { StaticDataSource } from './recommendation-service'
 
-const MIN_CURRENT_GAMES = 100
+const MIN_CURRENT_GAMES = 300
 const MIN_OPTION_GAMES = 30
 const MIN_LANE_GAMES = 30
 const PRIOR_GAMES = 50
@@ -34,6 +41,7 @@ export interface EvidenceProvider {
     role: Role,
     items: readonly Item[],
     opponent?: Champion,
+    filters?: ResearchFilters,
   ): EvidenceBundle | null
 }
 
@@ -132,6 +140,7 @@ export class ResearchEvidenceProvider implements EvidenceProvider {
     role: Role,
     items: readonly Item[],
     opponent?: Champion,
+    filters: ResearchFilters = DEFAULT_RESEARCH_FILTERS,
   ): EvidenceBundle | null {
     const version = this.source.latestVersion()
     if (version === null) return null
@@ -141,25 +150,34 @@ export class ResearchEvidenceProvider implements EvidenceProvider {
 
     let snapshot = current
     let totals = snapshot
-      ? championRoleTotals(this.db, snapshot.id, champion.key, role)
+      ? championRoleTotals(this.db, snapshot.id, champion.key, role, filters)
       : { games: 0, wins: 0 }
     let fallback = false
-    if (!snapshot || totals.games < MIN_CURRENT_GAMES) {
+    if (!snapshot) {
       if (!previous) return null
-      const previousTotals = championRoleTotals(this.db, previous.id, champion.key, role)
-      if (previousTotals.games < MIN_OPTION_GAMES) return null
       snapshot = previous
-      totals = previousTotals
+      totals = championRoleTotals(this.db, previous.id, champion.key, role, filters)
       fallback = true
+    } else if (totals.games < MIN_CURRENT_GAMES) {
+      const previousTotals = previous
+        ? championRoleTotals(this.db, previous.id, champion.key, role, filters)
+        : { games: 0, wins: 0 }
+      if (previous && previousTotals.games >= MIN_OPTION_GAMES) {
+        snapshot = previous
+        totals = previousTotals
+        fallback = true
+      }
     }
-    if (!snapshot || totals.games < MIN_OPTION_GAMES) return null
+    // A partial sample is still useful for an accurate "24 of 30 games" message.
+    if (!snapshot || totals.games === 0) return null
 
-    const slots = itemSlotSamples(this.db, snapshot.id, champion.key, role)
-    const overall = itemSamples(this.db, snapshot.id, champion.key, role)
-    const runes = runeSamples(this.db, snapshot.id, champion.key, role)
+    const slots = itemSlotSamples(this.db, snapshot.id, champion.key, role, items, filters)
+    const overall = itemSamples(this.db, snapshot.id, champion.key, role, items, filters)
+    const runes = runeSamples(this.db, snapshot.id, champion.key, role, filters)
+    const counts = researchFilterCounts(this.db, snapshot.id, filters, champion.key, role)
     const champions = this.source.champions(version)
     const byKey = new Map(champions.map((entry) => [entry.key, entry]))
-    const lanes = laneSamples(this.db, snapshot.id, champion.key, role).map((lane) => ({
+    const lanes = laneSamples(this.db, snapshot.id, champion.key, role, filters).map((lane) => ({
       enemyId: byKey.get(lane.enemyChampionKey)?.id ?? String(lane.enemyChampionKey),
       enemyName: byKey.get(lane.enemyChampionKey)?.name ?? `Champion ${lane.enemyChampionKey}`,
       games: lane.games,
@@ -173,6 +191,11 @@ export class ResearchEvidenceProvider implements EvidenceProvider {
         samplePatch: snapshot.patch,
         region: snapshot.region,
         rankScope: snapshot.rankScope,
+        tierScope: tierScopeLabel(filters),
+        roleScope: roleScopeLabel(filters),
+        filters,
+        excludedInferred: counts.excludedInferred,
+        excludedUnknownTier: counts.excludedUnknownTier,
         championGames: totals.games,
         fallback,
       },

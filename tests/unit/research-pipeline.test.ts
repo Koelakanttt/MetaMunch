@@ -5,9 +5,11 @@ import type { RiotApiProvider } from '../../src/main/providers/riot-api'
 import { RiotCircuitOpenError } from '../../src/main/providers/riot-request-manager'
 import { ResearchEvidenceProvider } from '../../src/main/services/research-evidence-provider'
 import { ResearchService } from '../../src/main/services/research-service'
+import { championRoleTotals, itemSamples, itemSlotSamples } from '../../src/main/db/research-aggregate-repo'
 import type { StaticDataSource } from '../../src/main/services/recommendation-service'
 import {
   createResearchSnapshot,
+  frontierSize,
   saveResearchMatch,
   type ResearchCrawlRow,
 } from '../../src/main/db/research-repo'
@@ -79,6 +81,8 @@ describe('research sample pipeline', () => {
       ahri,
       'TOP',
       items,
+      undefined,
+      { tier: 'diamond', includeInferred: false, includeUnknownTier: true },
     )
 
     expect(evidence?.scope.fallback).toBe(true)
@@ -207,6 +211,92 @@ describe('research sample pipeline', () => {
     expect(second.status().state).toBe('complete')
   })
 
+  it('counts every stored champion-role row, not a 100-game cap', () => {
+    const db = memoryDb()
+    const snapshot = createResearchSnapshot(db, {
+      patch: '16.21',
+      region: 'EUW1',
+      queueId: 420,
+      rankScope: 'MASTER+ / DIAMOND I-IV',
+      createdAt: 1,
+      targetMatches: 250,
+    })
+    for (let index = 0; index < 250; index += 1) {
+      saveResearchMatch(db, snapshot, matchWith(`EUW1_B1_${index}`, '16.21'))
+    }
+
+    expect(championRoleTotals(db, snapshot, 86, 'JUNGLE').games).toBe(250)
+  })
+
+  it('deduplicates completed items and excludes consumables and boots from item slots', () => {
+    const db = memoryDb()
+    const snapshot = createResearchSnapshot(db, {
+      patch: '16.21',
+      region: 'EUW1',
+      queueId: 420,
+      rankScope: 'MASTER+ / DIAMOND I-IV',
+      createdAt: 1,
+      targetMatches: 1,
+    })
+    const match: Match = {
+      ...matchWith('EUW1_ITEMS', '16.21'),
+      participants: base.participants.map((participant) =>
+        participant.championId === 86
+          ? { ...participant, items: [3033, 3033, 1001, 2003, 0, 0] }
+          : participant,
+      ),
+    }
+    saveResearchMatch(db, snapshot, match)
+
+    const overall = itemSamples(db, snapshot, 86, 'JUNGLE', items)
+    expect(overall.find((entry) => entry.itemId === 3033)?.games).toBe(1)
+    expect(overall.some((entry) => entry.itemId === 2003)).toBe(false)
+    const slots = itemSlotSamples(db, snapshot, 86, 'JUNGLE', items)
+    expect(slots.some((entry) => entry.itemId === 1001)).toBe(false)
+    expect(slots.some((entry) => entry.itemId === 2003)).toBe(false)
+  })
+
+  it('deletes other-player frontier identifiers after processing', async () => {
+    const db = memoryDb()
+    let leagueCalls = 0
+    const provider: RiotApiProvider = {
+      getAccountByRiotId: async () => ({ puuid: 'seed', gameName: 'Seed', tagLine: 'EUW' }),
+      getMatchIds: async () => ['EUW1_FOCUS'],
+      getMatch: async () => matchWith('EUW1_FOCUS', '16.21'),
+      getLeagueEntries: async () => {
+        leagueCalls += 1
+        return leagueCalls === 1
+          ? [
+              {
+                puuid: 'seed',
+                summonerId: null,
+                tier: 'DIAMOND',
+                rank: 'I',
+                queueType: 'RANKED_SOLO_5x5',
+                leaguePoints: 0,
+                wins: 0,
+                losses: 0,
+              },
+            ]
+          : []
+      },
+    }
+    const service = new ResearchService({
+      db,
+      provider,
+      source: source(),
+      getPatch: () => '16.21',
+      getRegion: () => 'EUW1',
+      now: () => 1,
+    })
+    service.setOptions({ focusChampionId: 'Garen', focusRole: 'JUNGLE', focusTarget: 1 })
+
+    await service.collect(1)
+
+    expect(service.status().focusGames).toBe(1)
+    expect(frontierSize(db)).toBe(0)
+  })
+
   it('keeps the research row columns compact and integer-based', () => {
     const db = memoryDb()
     const row = getResearchCrawl(db)
@@ -237,5 +327,14 @@ function getResearchCrawl(db: ReturnType<typeof memoryDb>): ResearchCrawlRow {
     updatedAt: Number(row?.['updated_at']),
     lastError: row?.['last_error'] === null ? null : String(row?.['last_error']),
     seedsExhausted: Number(row?.['seeds_exhausted']) === 1,
+    focusChampionId:
+      row?.['focus_champion_id'] === null || row?.['focus_champion_id'] === undefined
+        ? null
+        : String(row?.['focus_champion_id']),
+    focusRole:
+      row?.['focus_role'] === null || row?.['focus_role'] === undefined
+        ? null
+        : String(row?.['focus_role']),
+    focusTarget: Number(row?.['focus_target'] ?? 100),
   }
 }

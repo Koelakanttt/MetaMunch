@@ -7,7 +7,18 @@ import type {
   PatchChangesResponse,
 } from '@shared/patch-diff'
 import { ChampionIcon, ItemIcon } from '../components/Icon'
-import { Button, Card, EmptyState, Label, Select, StatusLine, TextInput } from '../components/ui'
+import {
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  Label,
+  PageHeader,
+  PageLayout,
+  Select,
+  StatusLine,
+  TextInput,
+} from '../components/ui'
 
 type Tab = 'champions' | 'items'
 
@@ -167,8 +178,17 @@ export function PatchChangesPage() {
     : []
 
   return (
-    <section className="space-y-4">
-      <Card title="Patch changes">
+    <PageLayout width="wide">
+      <PageHeader
+        title="Patch changes"
+        subtitle={
+          data
+            ? `Data Dragon diff from ${data.from ?? '?'} to ${data.to ?? '?'}. Changes come from public static data only.`
+            : 'Data Dragon diff between two patches.'
+        }
+        badges={loading ? <Badge>loading</Badge> : null}
+      />
+      <Card title="Patches">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="flex flex-col gap-1">
             <Label>From</Label>
@@ -349,6 +369,6 @@ export function PatchChangesPage() {
           ) : null}
         </>
       )}
-    </section>
+    </PageLayout>
   )
 }

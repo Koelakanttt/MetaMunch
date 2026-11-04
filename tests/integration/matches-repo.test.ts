@@ -73,12 +73,12 @@ describe('matches repo', () => {
     }
   })
 
-  it('throws when saving the same match twice', () => {
+  it('upserts the same match idempotently', () => {
     const db = migratedDb()
     const match = parseMatch(fixture('match.json'))
     saveMatch(db, match, ['puuid-me-0001'])
 
-    expect(() => saveMatch(db, match, ['puuid-me-0001'])).toThrow()
+    expect(() => saveMatch(db, match, ['puuid-me-0001'])).not.toThrow()
 
     const row = db
       .prepare('SELECT count(*) AS c FROM participants WHERE match_id = ?')
@@ -94,6 +94,10 @@ describe('matches repo', () => {
     expect(knownMatchIds(db, ['EUW1_7000000001', 'EUW1_7000000099'])).toEqual(
       new Set(['EUW1_7000000001']),
     )
+    expect(knownMatchIds(db, ['EUW1_7000000001'], 'puuid-me-0001')).toEqual(
+      new Set(['EUW1_7000000001']),
+    )
+    expect(knownMatchIds(db, ['EUW1_7000000001'], 'puuid-nobody')).toEqual(new Set())
     expect(knownMatchIds(db, [])).toEqual(new Set())
     expect(countMatches(db, 'puuid-me-0001')).toBe(1)
     expect(countMatches(db, 'puuid-nobody')).toBe(0)

@@ -4,7 +4,8 @@ import type { MatchTimelineResponse } from '@shared/match-timeline'
 import type { ChampionSummary } from '@shared/recommend-api'
 import { ROLES, type Role } from '@shared/rules'
 import { ChampionIcon, ItemIcon } from '../components/Icon'
-import { Button, Card, EmptyState, Label, Select, StatusLine } from '../components/ui'
+import { Button, Card, EmptyState, Label, PageHeader, PageLayout, Select, StatusLine } from '../components/ui'
+import { MatchReviewPage } from './MatchReviewPage'
 
 const QUEUES: { value: number; label: string }[] = [
   { value: 400, label: 'Normal' },
@@ -55,6 +56,9 @@ export function MatchHistoryPage({
   const [timelineLoading, setTimelineLoading] = useState(false)
   const [timelineError, setTimelineError] = useState('')
   const [selectedMatchId, setSelectedMatchId] = useState('')
+  const [reviewMatchId, setReviewMatchId] = useState('')
+  const [reviewVersion, setReviewVersion] = useState(0)
+  const [unreviewedOnly, setUnreviewedOnly] = useState(false)
   const requestIdRef = useRef(0)
 
   useEffect(() => {
@@ -91,7 +95,7 @@ export function MatchHistoryPage({
     }
 
     void run()
-  }, [refreshKey, championId, position, patch, queue])
+  }, [refreshKey, championId, position, patch, queue, reviewVersion])
 
   async function showTimeline(matchId: string): Promise<void> {
     setSelectedMatchId(matchId)
@@ -110,30 +114,45 @@ export function MatchHistoryPage({
 
   if (error) {
     return (
-      <Card title="Matches">
-        <StatusLine tone="error">error: {error}</StatusLine>
-      </Card>
+      <PageLayout>
+        <Card title="Matches">
+          <StatusLine tone="error">error: {error}</StatusLine>
+        </Card>
+      </PageLayout>
     )
   }
 
   if (!history) {
     return (
-      <Card title="Matches">
-        <StatusLine tone="muted">loading…</StatusLine>
-      </Card>
+      <PageLayout>
+        <Card title="Matches">
+          <StatusLine tone="muted">loading…</StatusLine>
+        </Card>
+      </PageLayout>
     )
   }
 
   if (!history.account) {
     return (
-      <Card title="Matches">
-        <EmptyState>No account set. Connect a Riot ID in Settings.</EmptyState>
-      </Card>
+      <PageLayout>
+        <PageHeader title="Matches" subtitle="Match history with filters, timelines and reviews." />
+        <Card>
+          <EmptyState>No account set. Connect a Riot ID in Settings.</EmptyState>
+        </Card>
+      </PageLayout>
     )
   }
 
+  const entries = unreviewedOnly
+    ? history.entries.filter((entry) => !entry.reviewed)
+    : history.entries
+
   return (
-    <section className="space-y-4">
+    <PageLayout width="wide">
+      <PageHeader
+        title="Matches"
+        subtitle={`${history.entries.length} synced matches. Filter by champion, role or patch, then open a match for its timeline and review.`}
+      />
       <Card title="Filters">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="flex flex-col gap-1">
@@ -188,6 +207,14 @@ export function MatchHistoryPage({
             </Select>
           </label>
         </div>
+        <label className="mt-2 flex items-center gap-2 text-sm text-slate-300">
+          <input
+            type="checkbox"
+            checked={unreviewedOnly}
+            onChange={(event) => setUnreviewedOnly(event.target.checked)}
+          />
+          Unreviewed only
+        </label>
         {!history.hasStaticData ? (
           <StatusLine tone="muted">
             Static data is missing: champion and item names are shown as ids. Press
@@ -199,7 +226,7 @@ export function MatchHistoryPage({
       <Card title="Recent matches">
         {loading ? (
           <StatusLine tone="muted">loading…</StatusLine>
-        ) : history.entries.length === 0 ? (
+        ) : entries.length === 0 ? (
           <EmptyState>No data yet. Sync matches or adjust the filters.</EmptyState>
         ) : (
           <div className="overflow-x-auto">
@@ -214,11 +241,11 @@ export function MatchHistoryPage({
                   <th className="py-2 pr-3 font-medium">Patch</th>
                   <th className="py-2 pr-3 font-medium">Duration</th>
                   <th className="py-2 pr-3 font-medium">Items</th>
-                  <th className="py-2 font-medium">Timeline</th>
+                  <th className="py-2 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {history.entries.map((entry) => (
+                {entries.map((entry) => (
                   <tr key={entry.matchId} className="border-b border-slate-800/60">
                     <td className="py-2 pr-3 text-slate-400">
                       {new Date(entry.gameCreation).toLocaleDateString()}
@@ -277,15 +304,24 @@ export function MatchHistoryPage({
                       )}
                     </td>
                     <td className="py-2">
-                      <Button
-                        variant="ghost"
-                        className="px-2 py-1 text-[11px]"
-                        onClick={() => {
-                          void showTimeline(entry.matchId)
-                        }}
-                      >
-                        View
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          className="px-2 py-1 text-[11px]"
+                          onClick={() => {
+                            void showTimeline(entry.matchId)
+                          }}
+                        >
+                          Timeline
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="px-2 py-1 text-[11px]"
+                          onClick={() => setReviewMatchId(entry.matchId)}
+                        >
+                          {entry.reviewed ? 'Review' : 'Review *'}
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -349,6 +385,15 @@ export function MatchHistoryPage({
           ) : null}
         </Card>
       ) : null}
-    </section>
+
+      {reviewMatchId ? (
+        <MatchReviewPage
+          key={reviewMatchId}
+          matchId={reviewMatchId}
+          onClose={() => setReviewMatchId('')}
+          onSaved={() => setReviewVersion((value) => value + 1)}
+        />
+      ) : null}
+    </PageLayout>
   )
 }

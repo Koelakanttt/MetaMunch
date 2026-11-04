@@ -27,3 +27,9 @@ Desktop app for League of Legends (region EUW). Uses only public data. Read-only
 
 ## Layout
 src/main (index.ts, ipc/, providers/, services/, db/) · src/preload · src/renderer · src/shared (types, zod schemas, ipc.ts) · data/ · tests/unit · tests/integration · tests/fixtures · docs/
+
+## Task log
+- 2026-11-01 (current): Fix CSS overflow/stacking on the Recommendations tab views and remove the legacy
+  champion-select error box; enforce strict Summoner's Rift item catalog hygiene (`isPurchasableOnSR`)
+  so event/legacy items such as Demon King's Crown (#3904) can never enter recommendation pools.
+

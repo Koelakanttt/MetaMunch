@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { Match } from '@shared/riot'
+import { inferRole } from '@shared/role-inference'
 import type {
   ResearchCrawlState,
   ResearchSnapshot,
@@ -18,13 +19,17 @@ export interface ResearchCrawlRow {
   updatedAt: number
   lastError: string | null
   seedsExhausted: boolean
+  focusChampionId: string | null
+  focusRole: string | null
+  focusTarget: number
 }
 
 export function getResearchCrawl(db: DatabaseSync): ResearchCrawlRow {
   const row = db
     .prepare(
       `SELECT patch, status, target_matches, daily_request_cap, requests_today,
-              request_day, emerald_plus, started_at, updated_at, last_error, seeds_exhausted
+              request_day, emerald_plus, started_at, updated_at, last_error, seeds_exhausted,
+              focus_champion_id, focus_role, focus_target
        FROM research_crawl WHERE id = 1`,
     )
     .get()
@@ -41,6 +46,9 @@ export function getResearchCrawl(db: DatabaseSync): ResearchCrawlRow {
       updatedAt: 0,
       lastError: null,
       seedsExhausted: false,
+      focusChampionId: null,
+      focusRole: null,
+      focusTarget: 100,
     }
   }
   return {
@@ -55,6 +63,15 @@ export function getResearchCrawl(db: DatabaseSync): ResearchCrawlRow {
     updatedAt: Number(row['updated_at']),
     lastError: row['last_error'] === null ? null : String(row['last_error']),
     seedsExhausted: Number(row['seeds_exhausted']) === 1,
+    focusChampionId:
+      row['focus_champion_id'] === null || row['focus_champion_id'] === undefined
+        ? null
+        : String(row['focus_champion_id']),
+    focusRole:
+      row['focus_role'] === null || row['focus_role'] === undefined
+        ? null
+        : String(row['focus_role']),
+    focusTarget: Number(row['focus_target'] ?? 100),
   }
 }
 
@@ -67,7 +84,8 @@ export function saveResearchCrawl(
     `UPDATE research_crawl SET
        patch = ?, status = ?, target_matches = ?, daily_request_cap = ?,
        requests_today = ?, request_day = ?, emerald_plus = ?, started_at = ?,
-       updated_at = ?, last_error = ?, seeds_exhausted = ?
+       updated_at = ?, last_error = ?, seeds_exhausted = ?,
+       focus_champion_id = ?, focus_role = ?, focus_target = ?
      WHERE id = 1`,
   ).run(
     value.patch === undefined ? current.patch : value.patch,
@@ -81,6 +99,9 @@ export function saveResearchCrawl(
     value.updatedAt,
     value.lastError === undefined ? current.lastError : value.lastError,
     (value.seedsExhausted ?? current.seedsExhausted) ? 1 : 0,
+    value.focusChampionId === undefined ? current.focusChampionId : value.focusChampionId,
+    value.focusRole === undefined ? current.focusRole : value.focusRole,
+    value.focusTarget ?? current.focusTarget,
   )
 }
 
@@ -272,11 +293,11 @@ export function saveResearchMatch(
 
     const insertRow = db.prepare(
       `INSERT OR IGNORE INTO research_rows
-        (match_id, team_id, tier_bucket, champion_id, team_position, win,
+        (match_id, team_id, tier_bucket, champion_id, team_position, role_source, win,
          item0, item1, item2, item3, item4, item5,
          keystone, primary_style, sub_style, primary_rune_ids, secondary_rune_ids,
          stat_shard_ids, patch)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     for (const participant of match.participants) {
       const items = participant.items
@@ -285,12 +306,19 @@ export function saveResearchMatch(
       const statShardIds = participant.statPerks
         ? [participant.statPerks.offense, participant.statPerks.flex, participant.statPerks.defense]
         : []
+      const role = inferRole({
+        teamPosition: participant.position,
+        individualPosition: participant.individualPosition ?? '',
+        summoner1: participant.summoner1,
+        summoner2: participant.summoner2,
+      })
       insertRow.run(
         match.id,
         participant.teamId,
         tierBucket,
         participant.championId,
-        participant.position,
+        role.role ?? '',
+        role.source,
         participant.win ? 1 : 0,
         items[0] ?? 0,
         items[1] ?? 0,
@@ -342,20 +370,33 @@ export function addFrontierPlayer(
   puuid: string,
   tierBucket: string,
   now: number,
+  priority = 0,
 ): boolean {
   const result = db
-    .prepare('INSERT OR IGNORE INTO research_frontier (puuid, tier_bucket, state, added_at) VALUES (?, ?, ?, ?)')
-    .run(puuid, tierBucket, 'pending', now)
-  return Number(result.changes) > 0
+    .prepare(
+      'INSERT OR IGNORE INTO research_frontier (puuid, tier_bucket, state, added_at, priority) VALUES (?, ?, ?, ?, ?)',
+    )
+    .run(puuid, tierBucket, 'pending', now, priority)
+  if (Number(result.changes) > 0) return true
+  if (priority > 0) {
+    db.prepare(
+      "UPDATE research_frontier SET priority = ? WHERE puuid = ? AND state = 'pending'",
+    ).run(priority, puuid)
+  }
+  return false
 }
 
-export function nextFrontierPlayer(
-  db: DatabaseSync,
-): { puuid: string; tierBucket: string } | null {
+export interface FrontierPlayer {
+  puuid: string
+  tierBucket: string
+  matchOffset: number
+}
+
+export function nextFrontierPlayer(db: DatabaseSync): FrontierPlayer | null {
   const row = db
     .prepare(
-      `SELECT puuid, tier_bucket FROM research_frontier
-       WHERE state = 'pending' ORDER BY added_at, rowid LIMIT 1`,
+      `SELECT puuid, tier_bucket, match_offset FROM research_frontier
+       WHERE state = 'pending' ORDER BY priority DESC, added_at, rowid LIMIT 1`,
     )
     .get()
   if (!row) return null
@@ -363,7 +404,24 @@ export function nextFrontierPlayer(
     'processing',
     String(row['puuid']),
   )
-  return { puuid: String(row['puuid']), tierBucket: String(row['tier_bucket']) }
+  return {
+    puuid: String(row['puuid']),
+    tierBucket: String(row['tier_bucket']),
+    matchOffset: Number(row['match_offset'] ?? 0),
+  }
+}
+
+export function rescheduleFrontierPlayer(
+  db: DatabaseSync,
+  puuid: string,
+  matchOffset: number,
+  now: number,
+): void {
+  db.prepare(
+    `UPDATE research_frontier
+     SET state = 'pending', match_offset = ?, added_at = ?
+     WHERE puuid = ?`,
+  ).run(matchOffset, now, puuid)
 }
 
 export function removeFrontierPlayer(db: DatabaseSync, puuid: string): void {
@@ -496,6 +554,10 @@ export function researchStatus(db: DatabaseSync): ResearchStatus {
       lastError: crawl.lastError,
       emeraldPlus: crawl.emeraldPlus,
       seedsExhausted: crawl.seedsExhausted,
+      focusChampionId: crawl.focusChampionId,
+      focusRole: crawl.focusRole,
+      focusGames: 0,
+      focusTarget: crawl.focusTarget,
       coverage: [],
     }
   }
@@ -516,6 +578,10 @@ export function researchStatus(db: DatabaseSync): ResearchStatus {
     lastError: crawl.lastError,
     emeraldPlus: crawl.emeraldPlus,
     seedsExhausted: crawl.seedsExhausted,
+    focusChampionId: crawl.focusChampionId,
+    focusRole: crawl.focusRole,
+    focusGames: 0,
+    focusTarget: crawl.focusTarget,
     coverage: [],
   }
 }

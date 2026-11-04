@@ -61,7 +61,7 @@ describe('MatchSyncService', () => {
     const service = await readyService(provider)
 
     const first = await service.sync()
-    expect(first).toEqual({ requested: 3, saved: 3, skippedExisting: 0, failed: 0 })
+    expect(first).toEqual({ requested: 3, saved: 3, skippedExisting: 0, filtered: 0, failed: 0 })
     expect(service.status()).toEqual({
       account: { gameName: 'Бигбули', tagLine: '22222' },
       matches: 3,
@@ -70,7 +70,7 @@ describe('MatchSyncService', () => {
     expect(calls.matches).toBe(3)
 
     const second = await service.sync()
-    expect(second).toEqual({ requested: 0, saved: 0, skippedExisting: 3, failed: 0 })
+    expect(second).toEqual({ requested: 0, saved: 0, skippedExisting: 3, filtered: 0, failed: 0 })
     expect(calls.matches).toBe(3)
   })
 
@@ -81,7 +81,7 @@ describe('MatchSyncService', () => {
 
     const result = await service.sync()
 
-    expect(result).toEqual({ requested: 3, saved: 2, skippedExisting: 0, failed: 1 })
+    expect(result).toEqual({ requested: 3, saved: 2, skippedExisting: 0, filtered: 0, failed: 1 })
   })
 
   it('rethrows a 403 from getMatch', async () => {
@@ -100,7 +100,7 @@ describe('MatchSyncService', () => {
 
     const result = await service.sync({ maxNewMatches: 2 })
 
-    expect(result).toEqual({ requested: 2, saved: 2, skippedExisting: 0, failed: 0 })
+    expect(result).toEqual({ requested: 2, saved: 2, skippedExisting: 0, filtered: 0, failed: 0 })
   })
 
   it('stores the account and reports it', async () => {

@@ -127,7 +127,7 @@ export function purchaseOrderForChampion(
          GROUP BY t.match_id, t.item_id
        )
        GROUP BY item_id
-       ORDER BY games DESC, item_id ASC
+       ORDER BY average_ms ASC, games DESC, item_id ASC
        LIMIT ?`,
     )
     .all(puuid, championKey, ...queues, limit)
@@ -246,7 +246,20 @@ export function skillEventsForChampion(
   puuid: string,
   championKey: number,
   queues: readonly number[] = PERSONAL_QUEUES,
+  opponentKey?: number | null,
 ): SkillEventRow[] {
+  const opponentClause =
+    opponentKey === undefined || opponentKey === null
+      ? ''
+      : `AND EXISTS (
+           SELECT 1 FROM participants enemy
+           WHERE enemy.match_id = p.match_id
+             AND enemy.team_id <> p.team_id
+             AND enemy.position = p.position
+             AND enemy.champion_id = ?
+         )`
+  const params: (string | number)[] = [puuid, championKey, ...queues]
+  if (opponentKey !== undefined && opponentKey !== null) params.push(opponentKey)
   const rows = db
     .prepare(
       `SELECT t.match_id, t.skill_slot, t.timestamp_ms, p.win
@@ -259,9 +272,10 @@ export function skillEventsForChampion(
          AND p.champion_id = ?
          AND m.remake = 0
          AND m.queue_id IN (${placeholders(queues.length)})
+         ${opponentClause}
        ORDER BY t.match_id, t.timestamp_ms`,
     )
-    .all(puuid, championKey, ...queues)
+    .all(...params)
   return rows.map((row) => ({
     matchId: String(row['match_id']),
     win: Number(row['win']) === 1,

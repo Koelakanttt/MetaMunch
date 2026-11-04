@@ -1,5 +1,6 @@
 import type { DatabaseSync } from 'node:sqlite'
 import type { Match, RiotAccount } from '@shared/riot'
+import { inferRole } from '@shared/role-inference'
 
 export interface StoredAccount {
   puuid: string
@@ -46,14 +47,24 @@ export function getAccount(db: DatabaseSync): StoredAccount | null {
   }
 }
 
-export function knownMatchIds(db: DatabaseSync, ids: readonly string[]): Set<string> {
+export function knownMatchIds(
+  db: DatabaseSync,
+  ids: readonly string[],
+  puuid: string | null = null,
+): Set<string> {
   const known = new Set<string>()
   if (ids.length === 0) return known
 
   const placeholders = ids.map(() => '?').join(', ')
+  const sql =
+    puuid === null
+      ? `SELECT match_id FROM matches WHERE match_id IN (${placeholders})`
+      : `SELECT m.match_id FROM matches m
+         JOIN participants p ON p.match_id = m.match_id AND p.puuid = ?
+         WHERE m.match_id IN (${placeholders})`
   const rows = db
-    .prepare(`SELECT match_id FROM matches WHERE match_id IN (${placeholders})`)
-    .all(...ids) as { match_id?: unknown }[]
+    .prepare(sql)
+    .all(...(puuid === null ? [] : [puuid]), ...ids) as { match_id?: unknown }[]
 
   for (const row of rows) known.add(String(row.match_id))
   return known
@@ -63,7 +74,7 @@ export function saveMatch(db: DatabaseSync, match: Match, trackedPuuids: readonl
   db.exec('BEGIN')
   try {
     db.prepare(
-      `INSERT INTO matches
+      `INSERT OR IGNORE INTO matches
         (match_id, platform, queue_id, patch, game_version, game_creation, duration_s, remake)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
@@ -79,19 +90,42 @@ export function saveMatch(db: DatabaseSync, match: Match, trackedPuuids: readonl
 
     const insertParticipant = db.prepare(
       `INSERT INTO participants
-        (match_id, slot, puuid, team_id, champion_id, position, win, items,
+        (match_id, slot, puuid, team_id, champion_id, position, role_source, win, items,
          trinket, summoner1, summoner2, keystone, primary_style, sub_style, perks, participant_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(match_id, slot) DO UPDATE SET
+         puuid = excluded.puuid,
+         team_id = excluded.team_id,
+         champion_id = excluded.champion_id,
+         position = excluded.position,
+         role_source = excluded.role_source,
+         win = excluded.win,
+         items = excluded.items,
+         trinket = excluded.trinket,
+         summoner1 = excluded.summoner1,
+         summoner2 = excluded.summoner2,
+         keystone = excluded.keystone,
+         primary_style = excluded.primary_style,
+         sub_style = excluded.sub_style,
+         perks = excluded.perks,
+         participant_id = excluded.participant_id`,
     )
     const tracked = new Set(trackedPuuids)
     match.participants.forEach((participant, slot) => {
+      const role = inferRole({
+        teamPosition: participant.position,
+        individualPosition: participant.individualPosition ?? '',
+        summoner1: participant.summoner1,
+        summoner2: participant.summoner2,
+      })
       insertParticipant.run(
         match.id,
         slot,
         tracked.has(participant.puuid) ? participant.puuid : null,
         participant.teamId,
         participant.championId,
-        participant.position,
+        role.role ?? '',
+        role.source,
         participant.win ? 1 : 0,
         JSON.stringify(participant.items),
         participant.trinket,

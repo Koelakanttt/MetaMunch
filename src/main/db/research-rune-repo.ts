@@ -18,16 +18,33 @@ export function researchRunePageTotals(
   championKey: number,
   role: string,
   limit = 6,
+  opponentKey?: number | null,
 ): RunePageRow[] {
+  const opponentClause =
+    opponentKey === undefined || opponentKey === null
+      ? ''
+      : `AND EXISTS (
+           SELECT 1 FROM research_rows enemy
+           WHERE enemy.match_id = r.match_id
+             AND enemy.team_id <> r.team_id
+             AND enemy.team_position = r.team_position
+             AND enemy.champion_id = ?
+         )`
   const rows = db
     .prepare(
       `SELECT r.keystone, r.primary_style, r.sub_style,
               r.primary_rune_ids, r.secondary_rune_ids, r.stat_shard_ids, r.win
        FROM research_rows r
        JOIN research_matches m ON m.match_id = r.match_id
-       WHERE m.snapshot_id = ? AND r.champion_id = ? AND r.team_position = ?`,
+       WHERE m.snapshot_id = ? AND r.champion_id = ? AND r.team_position = ?
+         ${opponentClause}`,
     )
-    .all(snapshotId, championKey, role)
+    .all(
+      snapshotId,
+      championKey,
+      role,
+      ...(opponentKey === undefined || opponentKey === null ? [] : [opponentKey]),
+    )
 
   const grouped = new Map<
     string,

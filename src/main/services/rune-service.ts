@@ -3,19 +3,26 @@ import type {
   PopularRunePage,
   Rune,
   RuneRef,
+  RuneSource,
   RuneTree,
   RunesResponse,
   ResearchRuneScope,
 } from '@shared/runes'
 import { statShardRef } from '@shared/runes'
+import { PERSONAL_QUEUES } from '@shared/personal'
+import type { ResearchFilters } from '@shared/research'
+import {
+  DEFAULT_RESEARCH_FILTERS,
+  roleScopeLabel,
+  tierScopeLabel,
+} from '@shared/research'
 import type { Role } from '@shared/rules'
 import { toPatch } from '@shared/riot'
-import { championRoleTotals } from '../db/research-aggregate-repo'
+import { championRoleTotals, researchRuneRows, type ResearchRuneRow } from '../db/research-aggregate-repo'
 import {
   previousResearchSnapshot,
   researchSnapshotForPatch,
 } from '../db/research-repo'
-import { researchRunePageTotals } from '../db/research-rune-repo'
 import type { RunePageRow } from '../db/rune-repo'
 import { runePageTotals } from '../db/rune-repo'
 import type { RuneDataProvider } from '../providers/rune-data'
@@ -23,7 +30,7 @@ import type { StaticDataSource } from './recommendation-service'
 
 const MIN_GAMES = 5
 const MIN_RESEARCH_GAMES = 30
-const MIN_RESEARCH_CHAMPION_GAMES = 100
+const MIN_RESEARCH_CHAMPION_GAMES = 300
 
 interface StoredPerkStyle {
   style: number
@@ -76,6 +83,50 @@ function ref(id: number, name: string | undefined, icon: string | undefined): Ru
   }
 }
 
+/** Groups filtered research rows into the rune-page rows the response builder expects. */
+function researchRunePages(rows: ResearchRuneRow[]): RunePageRow[] {
+  const grouped = new Map<
+    string,
+    {
+      keystone: number
+      primaryStyle: number
+      subStyle: number
+      perks: string
+      statPerks: string | null
+      games: number
+      wins: number
+    }
+  >()
+  for (const row of rows) {
+    if (row.keystone <= 0 || row.primaryStyle <= 0 || row.subStyle <= 0) continue
+    const perks = JSON.stringify([
+      { style: row.primaryStyle, selections: row.primaryRuneIds },
+      { style: row.subStyle, selections: row.secondaryRuneIds },
+    ])
+    const [offense, flex, defense] = row.statShardIds
+    const statPerks =
+      offense !== undefined && flex !== undefined && defense !== undefined
+        ? JSON.stringify({ offense, flex, defense })
+        : null
+    const key = `${perks}|${statPerks ?? ''}`
+    const entry = grouped.get(key) ?? {
+      keystone: row.keystone,
+      primaryStyle: row.primaryStyle,
+      subStyle: row.subStyle,
+      perks,
+      statPerks,
+      games: 0,
+      wins: 0,
+    }
+    entry.games += 1
+    if (row.win === 1) entry.wins += 1
+    grouped.set(key, entry)
+  }
+  return [...grouped.values()]
+    .sort((a, b) => b.games - a.games || b.wins - a.wins || a.keystone - b.keystone)
+    .slice(0, 6)
+}
+
 function treeSlots(
   tree: RuneTree | undefined,
   runeById: ReadonlyMap<number, Rune>,
@@ -104,7 +155,13 @@ export class RuneService {
     this.provider = deps.provider
   }
 
-  async popular(championId: string, role?: Role): Promise<RunesResponse> {
+  async popular(
+    championId: string,
+    role?: Role,
+    opponentId?: string | null,
+    source: RuneSource = 'combined',
+    filters: ResearchFilters = DEFAULT_RESEARCH_FILTERS,
+  ): Promise<RunesResponse> {
     const version = this.source.latestVersion()
     const champions = version === null ? [] : this.source.champions(version)
     const me = champions.find((champion) => champion.id === championId)
@@ -113,6 +170,8 @@ export class RuneService {
         version,
         championId,
         championName: null,
+        source,
+        opponentName: null,
         pages: [],
         researchPages: [],
         researchScope: null,
@@ -120,61 +179,93 @@ export class RuneService {
         note: null,
       }
     }
+    const opponent = opponentId
+      ? (champions.find((champion) => champion.id === opponentId) ?? null)
+      : null
+    const opponentKey = opponent?.key ?? null
 
-    const rows = runePageTotals(this.db, me.key)
+    const ownGeneral = runePageTotals(this.db, me.key, PERSONAL_QUEUES, 6, role)
+    const ownMatchup =
+      opponentKey === null
+        ? []
+        : runePageTotals(this.db, me.key, PERSONAL_QUEUES, 6, role, opponentKey)
+    const rows =
+      ownMatchup.some((row) => row.games >= MIN_GAMES) ? ownMatchup : ownGeneral
     const currentPatch = version === null ? null : toPatch(version)
     const currentSnapshot = currentPatch ? researchSnapshotForPatch(this.db, currentPatch) : null
     const previousSnapshot = currentPatch ? previousResearchSnapshot(this.db, currentPatch) : null
     const currentGames =
       currentSnapshot && role
-        ? championRoleTotals(this.db, currentSnapshot.id, me.key, role).games
+        ? championRoleTotals(this.db, currentSnapshot.id, me.key, role, filters).games
         : 0
     const snapshot =
-      currentSnapshot && currentGames >= MIN_RESEARCH_CHAMPION_GAMES
+      currentSnapshot && (currentGames >= MIN_RESEARCH_CHAMPION_GAMES || !previousSnapshot)
         ? currentSnapshot
         : previousSnapshot
     const fallback = snapshot !== null && snapshot !== currentSnapshot
-    const researchRows =
+    const generalResearchRows =
       role && snapshot
-        ? researchRunePageTotals(this.db, snapshot.id, me.key, role).filter(
-            (row) => row.games >= MIN_RESEARCH_GAMES,
-          )
+        ? researchRunePages(
+            researchRuneRows(this.db, snapshot.id, me.key, role, filters),
+          ).filter((row) => row.games >= MIN_RESEARCH_GAMES)
         : []
+    const matchupResearchRows =
+      role && snapshot && opponentKey !== null
+        ? researchRunePages(
+            researchRuneRows(this.db, snapshot.id, me.key, role, filters, opponentKey),
+          ).filter((row) => row.games >= MIN_RESEARCH_GAMES)
+        : []
+    const researchRows =
+      matchupResearchRows.length > 0 ? matchupResearchRows : generalResearchRows
     const sampleGames = role && snapshot
-      ? championRoleTotals(this.db, snapshot.id, me.key, role).games
+      ? championRoleTotals(this.db, snapshot.id, me.key, role, filters).games
       : 0
+    const sampleNote =
+      source !== 'personal' && snapshot && role && researchRows.length === 0 && sampleGames > 0
+        ? `Research sample has ${sampleGames} ${role} games on patch ${snapshot.patch}; 30 are required for rune rankings.`
+        : null
     const researchScope: ResearchRuneScope | null =
       researchRows.length > 0 && snapshot
         ? {
             region: snapshot.region,
-            rankScope: snapshot.rankScope,
+            rankScope: `${tierScopeLabel(filters)} · ${roleScopeLabel(filters)} · crawl ${snapshot.rankScope}`,
             patch: currentPatch ?? snapshot.patch,
             samplePatch: snapshot.patch,
             fallback,
             championGames: sampleGames,
           }
         : null
+    const matchupNote =
+      opponent && matchupResearchRows.length === 0 && researchRows.length > 0
+        ? `No matchup-specific rune sample vs ${opponent.name}; showing champion baseline.`
+        : opponent && source !== 'global' && ownMatchup.length === 0 && rows.length > 0
+          ? `No personal matchup rune sample vs ${opponent.name}; showing champion baseline.`
+          : null
 
     if (rows.length === 0 && researchRows.length === 0) {
       return {
         version,
         championId,
         championName: me.name,
+        source,
+        opponentName: opponent?.name ?? null,
         pages: [],
         researchPages: [],
         researchScope: null,
         hasStaticData: true,
-        note: null,
+        note: [matchupNote, sampleNote].filter(Boolean).join(' ') || null,
       }
     }
 
     let trees: RuneTree[] = []
-    let note: string | null = null
+    let note: string | null = [matchupNote, sampleNote].filter(Boolean).join(' ') || null
     if (version !== null) {
       try {
         trees = await this.provider.getRunes(version)
       } catch {
-        note = 'Rune names and icons are unavailable; showing rune ids only.'
+        note = note
+          ? `${note} Rune names and icons are unavailable; showing rune ids only.`
+          : 'Rune names and icons are unavailable; showing rune ids only.'
       }
     }
 
@@ -245,6 +336,8 @@ export class RuneService {
       version,
       championId,
       championName: me.name,
+      source,
+      opponentName: opponent?.name ?? null,
       pages: toPages(rows, MIN_GAMES),
       researchPages: toPages(researchRows, MIN_RESEARCH_GAMES, researchScope?.championGames),
       researchScope,

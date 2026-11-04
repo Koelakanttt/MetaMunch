@@ -1,13 +1,17 @@
 import { z } from 'zod'
 import type { EvidenceScope, ItemEvidence, LaneEvidence } from './evidence'
 import type { PersonalStats } from './personal'
-import type { Archetype, Damage, EnemyProfile } from './recommend'
+import type { Archetype, Damage, EnemyProfile, RecommendSource } from './recommend'
+import type { ResearchBuildSample } from './research'
+import { ResearchFiltersSchema } from './research'
 import { ROLES, type Metric } from './rules'
 
 export const RecommendRequestSchema = z.object({
   meId: z.string().min(1), // Data Dragon champion id, e.g. "MonkeyKing"
   role: z.enum(ROLES),
   enemyIds: z.array(z.string().min(1)).max(5),
+  source: z.enum(['global', 'personal', 'combined']).optional(),
+  filters: ResearchFiltersSchema.optional(),
 })
 export type RecommendRequest = z.infer<typeof RecommendRequestSchema>
 
@@ -25,7 +29,7 @@ export interface ChampionListResponse {
 export interface RecommendationView {
   itemId: number
   name: string
-  source: 'rules' | 'core' | 'personal' | 'research'
+  source: 'rules' | 'core' | 'personal' | 'research' | 'math'
   reasons: string[]
   ruleIds: string[]
   score: number
@@ -35,9 +39,20 @@ export interface RecommendationView {
   evidence: ItemEvidence | null
 }
 
+export interface MathBuildView {
+  items: RecommendationView[]
+  boots: RecommendationView[]
+  score: number
+  gold: number
+  note: string
+  sampleGames: number | null
+  samplePatch: string | null
+}
+
 export interface RecommendResponse {
   version: string
   level: 'rules' | 'core'
+  source: RecommendSource
   me: { id: string; name: string; damage: Damage; archetype: Archetype }
   profile: { metrics: Record<Metric, number>; names: EnemyProfile['names'] }
   core: RecommendationView[]
@@ -46,8 +61,12 @@ export interface RecommendResponse {
   personal: PersonalStats | null // null when no account is tracked
   evidence: EvidenceScope | null // local research sample scope; never global
   laneEvidence: LaneEvidence | null
+  /** Optional formula-only build, only when a research sample exists. */
+  mathBuild: MathBuildView | null
   /** Set when the champion-role has no usable research sample. */
   researchNote: string | null
+  /** Filtered research sample behind the research figures; null for personal-only or no sample. */
+  research: ResearchBuildSample | null
 }
 
 /** Validates an untrusted IPC payload. Throws an Error with a readable message. */

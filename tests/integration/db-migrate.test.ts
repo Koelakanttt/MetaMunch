@@ -15,8 +15,8 @@ describe('db migrations', () => {
   it('applies migrations', () => {
     const db = openDb(':memory:')
 
-    expect(runMigrations(db, migrations)).toBe(10)
-    expect(getSchemaVersion(db)).toBe(10)
+    expect(runMigrations(db, migrations)).toBe(15)
+    expect(getSchemaVersion(db)).toBe(15)
     expect(tableNames(db)).toContain('patches')
     expect(tableNames(db)).toContain('settings')
     expect(tableNames(db)).toContain('champions')
@@ -26,13 +26,16 @@ describe('db migrations', () => {
     expect(tableNames(db)).toContain('participants')
     expect(tableNames(db)).toContain('champion_details')
     expect(tableNames(db)).toContain('research_rows')
+    expect(tableNames(db)).toContain('research_timelines')
+    expect(tableNames(db)).toContain('lp_history')
+    expect(tableNames(db)).toContain('match_reviews')
   })
 
   it('is idempotent', () => {
     const db = openDb(':memory:')
 
-    expect(runMigrations(db, migrations)).toBe(10)
-    expect(runMigrations(db, migrations)).toBe(10)
+    expect(runMigrations(db, migrations)).toBe(15)
+    expect(runMigrations(db, migrations)).toBe(15)
   })
 
   it('round trips settings', () => {
